@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div style="max-width:900px;margin:auto;border:1px solid #ccc;padding:24px;background:#fff;">
+    <img src="/static/report/head.jpg" style="width:100%;max-width:800px;">
+    <h3 style="text-align:center;font-weight:bold;margin:24px 0 12px 0;letter-spacing:2px;">STUDENTS   PROGRESS   REPORT</h3>
+    <div style="font-size:13px;margin-bottom:2px;"><strong>STUDENT'S NAME:</strong> {{ student.name|upper }}&nbsp;&nbsp;&nbsp;&nbsp;<strong>ADM NO:</strong> {{ student.registration_number }}</div>
+    <div style="font-size:13px;margin-bottom:2px;"><strong>COURSE:</strong> {{ student.course.name|upper }}&nbsp;&nbsp;&nbsp;&nbsp;<strong>SCH:</strong> HEALTH SCIENCES</div>
+    <div style="font-size:13px;margin-bottom:2px;"><strong>LEVEL:</strong> 6 (DIPLOMA)&nbsp;&nbsp;&nbsp;&nbsp;<strong>ACADEMIC YEAR:</strong> {{ year }}</div>
+    <div style="font-size:13px;margin-bottom:8px;"><strong>TERM:</strong> {{ term }}</div>
+    <table border="1" cellspacing="0" cellpadding="4" style="width:100%;font-size:13px;margin-bottom:12px;border-collapse:collapse;">
+        <tr style="background:#f2f2f2;font-weight:bold;text-align:center;">
+            <td>SUBJECT/UNIT</td>
+            <td>CAT</td>
+            <td>END TERM</td>
+            <td>AVERAGE%</td>
+            <td>REMARKS</td>
+        </tr>
+        {% for row in results %}
+        <tr style="text-align:center;">
+            <td style="text-align:left;">{{ row.unit }}</td>
+            <td>{{ row.cat }}</td>
+            <td>{{ row.end_term }}</td>
+            <td>{{ row.average }}</td>
+            <td>{{ row.remark }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <div style="font-size:13px;margin-bottom:8px;">
+        <span style="font-weight:bold;">MEAN SCORE: {{ mean_score }}</span>
+        <span style="display:inline-block;width:60px;"></span>
+        <span style="font-weight:bold;">GRADES: {{ grade }}</span>
+    </div>
+    <table border="1" cellspacing="0" cellpadding="2" style="font-size:11px;width:120px;margin-bottom:12px;">
+        <tr><td style="font-weight:bold;font-size:11px;">Grading system:</td></tr>
+        <tr><td>75-100 – <b>A</b> (Distinction)</td></tr>
+        <tr><td>60 – 75 – <b>B</b> (Credit)</td></tr>
+        <tr><td>40 – 59 – <b>C</b> (Pass)</td></tr>
+        <tr><td>0 – 39 – <b>D</b> (Fail)</td></tr>
+    </table>
+    <div style="margin:18px 0 6px 0;">
+        <span style="font-style:italic;">Signed_________________</span>
+        <span style="display:inline-block;width:80px;"></span>
+        <span style="font-style:italic;">Signed_________________</span>
+    </div>
+    <div style="text-align:left;font-weight:bold;font-style:italic;">
+        <span style="margin-right:80px;">EXAMINATION</span>
+        <span>PRINCIPAL</span>
+    </div>
+    <img src="/static/report/foot.png" style="width:100%;max-width:800px;margin-top:24px;">
+    <form method="post" action="{% url 'exams:download_report' %}" style="margin-top:32px;">
+        {% csrf_token %}
+        <input type="hidden" name="student_id" value="{{ student.id }}">
+        <input type="hidden" name="year" value="{{ year }}">
+        <input type="hidden" name="term" value="{{ term }}">
+        <button type="submit" class="btn btn-primary">Download as Word</button>
+    </form>
+</div>
+{% endblock %} 

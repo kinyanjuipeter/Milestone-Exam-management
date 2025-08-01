@@ -1,0 +1,619 @@
+{% extends 'base.html' %}
+
+{% block title %}Enter Marks - Exam Management System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-edit text-primary me-2"></i>
+            Enter Exam Marks (Bulk Entry)
+        </h2>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Bulk Entry Form -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-table me-2"></i>
+                    Bulk Entry Configuration
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="bulkEntryForm">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="course" class="form-label">
+                                <i class="fas fa-graduation-cap me-1"></i>Course
+                            </label>
+                            <select name="course" id="course" class="form-control" required>
+                                <option value="">Select Course</option>
+                                {% for course in courses %}
+                                    <option value="{{ course.id }}">{{ course.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Or type a new course name below</small>
+                            <input type="text" id="new_course" class="form-control mt-1" placeholder="Type new course name">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="school" class="form-label">
+                                <i class="fas fa-school me-1"></i>School
+                            </label>
+                            <input type="text" name="school" id="school" class="form-control" placeholder="Enter School Name" required>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="unit" class="form-label">
+                                <i class="fas fa-book me-1"></i>Unit
+                            </label>
+                            <select name="unit" id="unit" class="form-control" required>
+                                <option value="">Select Unit</option>
+                                {% for unit in units %}
+                                    <option value="{{ unit.id }}">{{ unit.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Or type a new unit name below</small>
+                            <input type="text" id="new_unit" class="form-control mt-1" placeholder="Type new unit name">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="term" class="form-label">
+                                <i class="fas fa-calendar me-1"></i>Term
+                            </label>
+                            <select name="term" id="term" class="form-control" required>
+                                <option value="">Select Term</option>
+                                {% for term in terms %}
+                                    <option value="{{ term }}">{{ term }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="level" class="form-label">
+                                <i class="fas fa-layer-group me-1"></i>Level
+                            </label>
+                            <select name="level" id="level" class="form-control" required>
+                                <option value="">Select Level</option>
+                                {% for level in levels %}
+                                    <option value="{{ level }}">{{ level }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="year" class="form-label">
+                                <i class="fas fa-calendar-alt me-1"></i>Year
+                            </label>
+                            <select name="year" id="year" class="form-control" required>
+                                <option value="">Select Year</option>
+                                {% for year in years %}
+                                    <option value="{{ year }}">{{ year }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3 d-flex align-items-end">
+                            <button type="button" id="loadStudentsBtn" class="btn btn-info w-100">
+                                <i class="fas fa-users me-2"></i>Load Students
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Students Table -->
+<div class="row mt-4" id="studentsTableSection" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-table me-2"></i>
+                    Student Marks Entry
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="marksEntryForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="bulk_save" value="1">
+                    
+                    <!-- Copy the configuration fields -->
+                    <input type="hidden" name="course" id="course_hidden">
+                    <input type="hidden" name="school" id="school_hidden">
+                    <input type="hidden" name="unit" id="unit_hidden">
+                    <input type="hidden" name="term" id="term_hidden">
+                    <input type="hidden" name="level" id="level_hidden">
+                    <input type="hidden" name="year" id="year_hidden">
+                    
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered" id="studentsTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width: 5%; color: black;">#</th>
+                                    <th style="width: 25%; color: black;">Student Name</th>
+                                    <th style="width: 15%;">Admission Number</th>
+                                    <th style="width: 15%;color: black;">CAT 1 (0-30)</th>
+                                    <th style="width: 15%;color: black;">CAT 2 (0-30)</th>
+                                    <th style="width: 15%;color: black;">End Term (0-70)</th>
+                                    <th style="width: 10%;color: black;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentsTableBody">
+                                <!-- Students will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12 text-center">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-save me-2"></i>Save All Marks
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Add New Student Section -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-user-plus me-2"></i>Add New Student
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <input type="text" id="new_student_name" class="form-control" placeholder="Student Name">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input type="text" id="new_admission_number" class="form-control" placeholder="Admission Number">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" id="addStudentBtn" class="btn btn-info w-100">
+                                            <i class="fas fa-plus me-1"></i>Add
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Single Entry Form (Collapsible) -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header" id="singleEntryHeader">
+                <h5 class="mb-0">
+                    <button class="btn btn-link text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#singleEntryCollapse">
+                        <i class="fas fa-plus me-2"></i>Single Entry Form
+                    </button>
+                </h5>
+            </div>
+            <div id="singleEntryCollapse" class="collapse">
+                <div class="card-body">
+                    <form method="post" id="singleEntryForm">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.student.id_for_label }}" class="form-label">
+                                <i class="fas fa-user-graduate me-1"></i>Student
+                            </label>
+                            {{ form.student }}
+                            {% if form.student.errors %}
+                                <div class="text-danger small">{{ form.student.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.unit.id_for_label }}" class="form-label">
+                                <i class="fas fa-subject me-1"></i>Unit
+                            </label>
+                            {{ form.unit }}
+                            {% if form.unit.errors %}
+                                <div class="text-danger small">{{ form.unit.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.cat1_score.id_for_label }}" class="form-label">
+                                <i class="fas fa-chart-line me-1"></i>CAT 1 Score
+                                <small class="text-muted">(0-30)</small>
+                            </label>
+                            {{ form.cat1_score }}
+                            {% if form.cat1_score.errors %}
+                                <div class="text-danger small">{{ form.cat1_score.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.cat2_score.id_for_label }}" class="form-label">
+                                <i class="fas fa-chart-line me-1"></i>CAT 2 Score
+                                <small class="text-muted">(0-30)</small>
+                            </label>
+                            {{ form.cat2_score }}
+                            {% if form.cat2_score.errors %}
+                                <div class="text-danger small">{{ form.cat2_score.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.end_term_score.id_for_label }}" class="form-label">
+                                <i class="fas fa-chart-bar me-1"></i>End Term Score
+                                <small class="text-muted">(0-70)</small>
+                            </label>
+                            {{ form.end_term_score }}
+                            {% if form.end_term_score.errors %}
+                                <div class="text-danger small">{{ form.end_term_score.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Real-time Calculation Display -->
+                    <div class="row mt-3">
+                        <div class="col-md-4">
+                            <div class="alert alert-info text-center">
+                                <h6 class="mb-1">CAT Average</h6>
+                                <h4 class="mb-0" id="catAverage">0.00</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="alert alert-success text-center">
+                                <h6 class="mb-1">Total Average</h6>
+                                <h4 class="mb-0" id="totalAverage">0.00</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="alert alert-warning text-center">
+                                <h6 class="mb-1">Grade</h6>
+                                <h4 class="mb-0" id="grade">-</h4>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary btn-lg w-100">
+                                <i class="fas fa-save me-2"></i>Save Exam Record
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-user-graduate fa-2x text-primary mb-2"></i>
+                <h5>{{ students.count }}</h5>
+                <p class="text-muted">Total Students</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-subject fa-2x text-success mb-2"></i>
+                <h5>{{ units.count }}</h5>
+                <p class="text-muted">Total Units</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-info-circle fa-2x text-info mb-2"></i>
+                <h5>Bulk Entry</h5>
+                <p class="text-muted">Excel-like Format</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Students data for bulk entry
+    const studentsByCourse = {{ students_data_json|safe }};
+    
+    // Load Students Button
+    document.getElementById('loadStudentsBtn').addEventListener('click', function() {
+        const courseSelect = document.getElementById('course');
+        const newCourseInput = document.getElementById('new_course');
+        const unitSelect = document.getElementById('unit');
+        const newUnitInput = document.getElementById('new_unit');
+        const school = document.getElementById('school').value;
+        const term = document.getElementById('term').value;
+        const level = document.getElementById('level').value;
+        const year = document.getElementById('year').value;
+        
+        // Determine course value
+        let courseValue = courseSelect.value;
+        if (!courseValue && newCourseInput.value.trim()) {
+            courseValue = newCourseInput.value.trim();
+        }
+        
+        // Determine unit value
+        let unitValue = unitSelect.value;
+        if (!unitValue && newUnitInput.value.trim()) {
+            unitValue = newUnitInput.value.trim();
+        }
+        
+        if (!courseValue || !school || !unitValue || !term || !level || !year) {
+            alert('Please fill in all configuration fields first.');
+            return;
+        }
+        
+        // Copy values to hidden fields
+        document.getElementById('course_hidden').value = courseValue;
+        document.getElementById('school_hidden').value = school;
+        document.getElementById('unit_hidden').value = unitValue;
+        document.getElementById('term_hidden').value = term;
+        document.getElementById('level_hidden').value = level;
+        document.getElementById('year_hidden').value = year;
+        
+        // Load students for the selected course
+        loadStudentsForCourse(courseValue);
+        
+        // Show the table section
+        document.getElementById('studentsTableSection').style.display = 'block';
+    });
+    
+    // Add New Student Button
+    document.getElementById('addStudentBtn').addEventListener('click', function() {
+        const studentName = document.getElementById('new_student_name').value.trim();
+        const admissionNumber = document.getElementById('new_admission_number').value.trim();
+        
+        if (!studentName || !admissionNumber) {
+            alert('Please enter both student name and admission number.');
+            return;
+        }
+        
+        addNewStudentToTable(studentName, admissionNumber);
+        
+        // Clear the inputs
+        document.getElementById('new_student_name').value = '';
+        document.getElementById('new_admission_number').value = '';
+    });
+    
+    function addNewStudentToTable(name, admissionNumber) {
+        const tbody = document.getElementById('studentsTableBody');
+        const rowCount = tbody.children.length;
+        
+        // Generate a temporary ID for the new student
+        const tempId = 'new_' + Date.now() + '_' + rowCount;
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${rowCount + 1}</td>
+            <td>${name}</td>
+            <td>${admissionNumber}</td>
+            <td>
+                <input type="number" name="cat1_${tempId}" class="form-control cat1-input" 
+                       min="0" max="30" step="0.01" placeholder="0-30">
+            </td>
+            <td>
+                <input type="number" name="cat2_${tempId}" class="form-control cat2-input" 
+                       min="0" max="30" step="0.01" placeholder="0-30">
+            </td>
+            <td>
+                <input type="number" name="endterm_${tempId}" class="form-control endterm-input" 
+                       min="0" max="70" step="0.01" placeholder="0-70">
+            </td>
+            <td>
+                <span class="total-score">0.00</span>
+            </td>
+        `;
+        
+        // Add hidden fields for student info
+        const form = document.getElementById('marksEntryForm');
+        const studentNameInput = document.createElement('input');
+        studentNameInput.type = 'hidden';
+        studentNameInput.name = `student_name_${tempId}`;
+        studentNameInput.value = name;
+        form.appendChild(studentNameInput);
+        
+        const admissionNumberInput = document.createElement('input');
+        admissionNumberInput.type = 'hidden';
+        admissionNumberInput.name = `admission_number_${tempId}`;
+        admissionNumberInput.value = admissionNumber;
+        form.appendChild(admissionNumberInput);
+        
+        tbody.appendChild(row);
+        
+        // Add event listeners for real-time calculation
+        addCalculationListeners();
+    }
+    
+    function loadStudentsForCourse(courseId) {
+        const tbody = document.getElementById('studentsTableBody');
+        tbody.innerHTML = '';
+        
+        // Find students for this course
+        const courseStudents = studentsByCourse[courseId] || [];
+        
+        if (courseStudents.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No students found for this course.</td></tr>';
+            return;
+        }
+        
+        // Create table rows
+        courseStudents.forEach((student, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${student.name}</td>
+                <td>${student.registration_number}</td>
+                <td>
+                    <input type="number" name="cat1_${student.id}" class="form-control cat1-input" 
+                           min="0" max="30" step="0.01" placeholder="0-30">
+                </td>
+                <td>
+                    <input type="number" name="cat2_${student.id}" class="form-control cat2-input" 
+                           min="0" max="30" step="0.01" placeholder="0-30">
+                </td>
+                <td>
+                    <input type="number" name="endterm_${student.id}" class="form-control endterm-input" 
+                           min="0" max="70" step="0.01" placeholder="0-70">
+                </td>
+                <td>
+                    <span class="total-score">0.00</span>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+        
+        // Add event listeners for real-time calculation
+        addCalculationListeners();
+    }
+    
+    function addCalculationListeners() {
+        const rows = document.querySelectorAll('#studentsTableBody tr');
+        rows.forEach(row => {
+            const cat1Input = row.querySelector('.cat1-input');
+            const cat2Input = row.querySelector('.cat2-input');
+            const endtermInput = row.querySelector('.endterm-input');
+            const totalSpan = row.querySelector('.total-score');
+            
+            if (cat1Input && cat2Input && endtermInput && totalSpan) {
+                const calculateTotal = () => {
+                    const cat1 = parseFloat(cat1Input.value) || 0;
+                    const cat2 = parseFloat(cat2Input.value) || 0;
+                    const endterm = parseFloat(endtermInput.value) || 0;
+                    const catAverage = (cat1 + cat2) / 2;
+                    const total = catAverage + endterm;
+                    totalSpan.textContent = total.toFixed(2);
+                };
+                
+                cat1Input.addEventListener('input', calculateTotal);
+                cat2Input.addEventListener('input', calculateTotal);
+                endtermInput.addEventListener('input', calculateTotal);
+            }
+        });
+    }
+    
+    // Single entry form calculations (existing functionality)
+    const cat1Input = document.getElementById('{{ form.cat1_score.id_for_label }}');
+    const cat2Input = document.getElementById('{{ form.cat2_score.id_for_label }}');
+    const endTermInput = document.getElementById('{{ form.end_term_score.id_for_label }}');
+    
+    const catAverageDisplay = document.getElementById('catAverage');
+    const totalAverageDisplay = document.getElementById('totalAverage');
+    const gradeDisplay = document.getElementById('grade');
+    
+    function calculateAverages() {
+        const cat1 = parseFloat(cat1Input.value) || 0;
+        const cat2 = parseFloat(cat2Input.value) || 0;
+        const endTerm = parseFloat(endTermInput.value) || 0;
+        
+        // Calculate CAT average
+        const catAverage = (cat1 + cat2) / 2;
+        catAverageDisplay.textContent = catAverage.toFixed(2);
+        
+        // Calculate total average
+        const totalAverage = catAverage + endTerm;
+        totalAverageDisplay.textContent = totalAverage.toFixed(2);
+        
+        // Calculate grade
+        let grade = '-';
+        if (totalAverage >= 80) {
+            grade = 'A';
+        } else if (totalAverage >= 70) {
+            grade = 'B';
+        } else if (totalAverage >= 60) {
+            grade = 'C';
+        } else if (totalAverage >= 50) {
+            grade = 'D';
+        } else if (totalAverage > 0) {
+            grade = 'F';
+        }
+        gradeDisplay.textContent = grade;
+        
+        // Update colors based on performance
+        if (totalAverage >= 70) {
+            totalAverageDisplay.parentElement.className = 'alert alert-success text-center';
+        } else if (totalAverage >= 50) {
+            totalAverageDisplay.parentElement.className = 'alert alert-warning text-center';
+        } else if (totalAverage > 0) {
+            totalAverageDisplay.parentElement.className = 'alert alert-danger text-center';
+        } else {
+            totalAverageDisplay.parentElement.className = 'alert alert-secondary text-center';
+        }
+    }
+    
+    // Add event listeners for real-time calculation
+    if (cat1Input && cat2Input && endTermInput) {
+    cat1Input.addEventListener('input', calculateAverages);
+    cat2Input.addEventListener('input', calculateAverages);
+    endTermInput.addEventListener('input', calculateAverages);
+    
+    // Initial calculation
+    calculateAverages();
+    }
+    
+    // Form validation
+    const singleEntryForm = document.getElementById('singleEntryForm');
+    if (singleEntryForm) {
+        singleEntryForm.addEventListener('submit', function(e) {
+        const cat1 = parseFloat(cat1Input.value) || 0;
+        const cat2 = parseFloat(cat2Input.value) || 0;
+        const endTerm = parseFloat(endTermInput.value) || 0;
+        
+        if (cat1 < 0 || cat1 > 30) {
+            e.preventDefault();
+            alert('CAT 1 score must be between 0 and 30');
+            return;
+        }
+        
+        if (cat2 < 0 || cat2 > 30) {
+            e.preventDefault();
+            alert('CAT 2 score must be between 0 and 30');
+            return;
+        }
+        
+        if (endTerm < 0 || endTerm > 70) {
+            e.preventDefault();
+            alert('End-term score must be between 0 and 70');
+            return;
+        }
+    });
+    }
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm p-4 mb-4">
+    <h4 class="mb-3">Generate Pass List</h4>
+    <form method="post" class="row g-3 mb-4">
+        {% csrf_token %}
+        <div class="col-md-5">
+            <label for="course" class="form-label">Course</label>
+            <select name="course" id="course" class="form-select" required>
+                <option value="all" {% if selected_course == 'all' %}selected{% endif %}>All Courses</option>
+                <option value="">Select Course</option>
+                {% for course in courses %}
+                <option value="{{ course.id }}" {% if course == selected_course %}selected{% endif %}>{{ course.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="term" class="form-label">Term</label>
+            <select name="term" id="term" class="form-select" required>
+                <option value="">Select Term</option>
+                {% for t in terms %}
+                <option value="{{ t }}" {% if t == selected_term %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 align-self-end">
+            <button type="submit" class="btn btn-primary">Generate</button>
+        </div>
+    </form>
+    {% if pass_list %}
+    <div class="table-responsive mb-3">
+        <table class="table table-bordered align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>No.</th>
+                    {% if selected_course == 'all' %}<th>Course</th>{% endif %}
+                    <th>Student Name</th>
+                    <th>Reg No</th>
+                    <th>Total Average</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in pass_list %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    {% if selected_course == 'all' %}<td>{{ student.course }}</td>{% endif %}
+                    <td>{{ student.name }}</td>
+                    <td>{{ student.reg }}</td>
+                    <td>{{ student.total_avg }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <form method="post" action="{% url 'exams:download_pass_list' %}">
+        {% csrf_token %}
+        {% if selected_course != 'all' %}
+        <input type="hidden" name="course_id" value="{{ selected_course.id }}">
+        {% else %}
+        <input type="hidden" name="course_id" value="all">
+        {% endif %}
+        <input type="hidden" name="term" value="{{ selected_term }}">
+        <button type="submit" class="btn btn-success">Download as Word</button>
+    </form>
+    {% elif selected_course and selected_term %}
+        <div class="alert alert-warning">No students found who passed all units for this course and term.</div>
+    {% endif %}
+</div>
+{% endblock %} 

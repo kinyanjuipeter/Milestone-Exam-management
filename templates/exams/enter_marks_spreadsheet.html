@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block title %}Spreadsheet Entry - Exam Management System{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'exams:enter_marks_per_student' %}" class="btn btn-outline-success">
+        <i class="fas fa-user-edit me-2"></i>Enter Marks Per Student
+    </a>
+</div>
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-table text-primary me-2"></i>
+            Spreadsheet Entry: Course, Unit, Students & Marks
+        </h2>
+    </div>
+</div>
+
+<form method="post" id="spreadsheetForm">
+    {% csrf_token %}
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <label for="course" class="form-label">Course</label>
+            <input list="course-list" name="course" id="course" class="form-control" required placeholder="Type or select course">
+            <datalist id="course-list">
+                {% for course in courses %}
+                <option value="{{ course.name }}">
+                {% endfor %}
+            </datalist>
+        </div>
+        <div class="col-md-4 mb-3">
+            <label for="unit" class="form-label">Unit</label>
+            <input list="unit-list" name="unit" id="unit" class="form-control" required placeholder="Type or select unit">
+            <datalist id="unit-list">
+                {% for unit in units %}
+                <option value="{{ unit.name }}">
+                {% endfor %}
+            </datalist>
+        </div>
+        <div class="col-md-4 mb-3">
+            <label for="school" class="form-label">School</label>
+            <input type="text" name="school" id="school" class="form-control" required placeholder="Enter school">
+        </div>
+        <div class="col-md-4 mb-3">
+            <label for="level" class="form-label">Level</label>
+            <input type="text" name="level" id="level" class="form-control" required placeholder="Enter level">
+        </div>
+        <div class="col-md-2 mb-3">
+            <label for="term" class="form-label">Term</label>
+            <input type="text" name="term" id="term" class="form-control" value="I" required>
+        </div>
+        <div class="col-md-2 mb-3">
+            <label for="year" class="form-label">Year</label>
+            <input type="number" name="year" id="year" class="form-control" value="2025" required>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-users me-2"></i>
+                Students & Marks
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle text-center" id="marksTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Registration No</th>
+                            <th>CAT 1<br><small>(0-30)</small></th>
+                            <th>CAT 2<br><small>(0-30)</small></th>
+                            <th>End Term<br><small>(0-70)</small></th>
+                            <th>CAT Avg</th>
+                            <th>Total</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="marksTableBody">
+                        <tr>
+                            <td><input type="text" name="student_name" class="form-control" required></td>
+                            <td><input type="text" name="reg_no" class="form-control" required></td>
+                            <td><input type="number" name="cat1" class="form-control cat1-input" min="0" max="30" step="0.01"></td>
+                            <td><input type="number" name="cat2" class="form-control cat2-input" min="0" max="30" step="0.01"></td>
+                            <td><input type="number" name="endterm" class="form-control endterm-input" min="0" max="70" step="0.01"></td>
+                            <td><span class="cat-avg">0.00</span></td>
+                            <td><span class="total-avg">0.00</span></td>
+                            <td><button type="button" class="btn btn-danger btn-sm remove-row"><i class="fas fa-trash"></i></button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-secondary" id="addRowBtn">
+                <i class="fas fa-plus"></i> Add Row
+            </button>
+            <button type="submit" class="btn btn-success float-end">
+                <i class="fas fa-save me-2"></i>Save All
+            </button>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function recalcRow(row) {
+    const cat1 = parseFloat(row.querySelector('input[name="cat1"]').value) || 0;
+    const cat2 = parseFloat(row.querySelector('input[name="cat2"]').value) || 0;
+    const endterm = parseFloat(row.querySelector('input[name="endterm"]').value) || 0;
+    const catAvg = (cat1 + cat2) / 2;
+    const total = catAvg + endterm;
+    row.querySelector('.cat-avg').textContent = catAvg.toFixed(2);
+    row.querySelector('.total-avg').textContent = total.toFixed(2);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const tableBody = document.getElementById('marksTableBody');
+    const addRowBtn = document.getElementById('addRowBtn');
+
+    function addRow() {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><input type="text" name="student_name" class="form-control" required></td>
+            <td><input type="text" name="reg_no" class="form-control" required></td>
+            <td><input type="number" name="cat1" class="form-control cat1-input" min="0" max="30" step="0.01"></td>
+            <td><input type="number" name="cat2" class="form-control cat2-input" min="0" max="30" step="0.01"></td>
+            <td><input type="number" name="endterm" class="form-control endterm-input" min="0" max="70" step="0.01"></td>
+            <td><span class="cat-avg">0.00</span></td>
+            <td><span class="total-avg">0.00</span></td>
+            <td><button type="button" class="btn btn-danger btn-sm remove-row"><i class="fas fa-trash"></i></button></td>
+        `;
+        tableBody.appendChild(row);
+        attachRowEvents(row);
+    }
+
+    function attachRowEvents(row) {
+        row.querySelectorAll('input[name="cat1"], input[name="cat2"], input[name="endterm"]').forEach(input => {
+            input.addEventListener('input', function() { recalcRow(row); });
+        });
+        row.querySelector('.remove-row').addEventListener('click', function() {
+            if (tableBody.rows.length > 1) row.remove();
+        });
+    }
+
+    // Attach events to initial row
+    attachRowEvents(tableBody.rows[0]);
+    addRowBtn.addEventListener('click', addRow);
+});
+</script>
+{% endblock %} 

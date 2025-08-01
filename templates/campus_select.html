@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Campus</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 25%, #3b82f6 50%, #1e40af 75%, #1e3a8a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            color: #ffffff;
+        }
+        .campus-card {
+            transition: transform 0.3s ease;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #0d6efd;
+            box-shadow: 0 8px 32px rgba(13, 110, 253, 0.3);
+        }
+        .campus-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(13, 110, 253, 0.4);
+            border-color: #0b5ed7;
+        }
+        .campus-selected {
+            border-color: #dc3545 !important;
+            box-shadow: 0 8px 32px rgba(220, 53, 69, 0.3) !important;
+        }
+        .campus-selected:hover {
+            box-shadow: 0 12px 40px rgba(220, 53, 69, 0.4) !important;
+        }
+        .password-field {
+            display: none;
+        }
+        .campus-selected .password-field {
+            display: block;
+        }
+        .alert {
+            border-radius: 10px;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #ffffff;
+            backdrop-filter: blur(10px);
+        }
+        .alert-info {
+            background: rgba(13, 110, 253, 0.15);
+            border-color: rgba(13, 110, 253, 0.4);
+        }
+        .alert-warning {
+            background: rgba(255, 193, 7, 0.15);
+            border-color: rgba(255, 193, 7, 0.4);
+        }
+        .alert-danger {
+            background: rgba(220, 53, 69, 0.15);
+            border-color: rgba(220, 53, 69, 0.4);
+        }
+        .alert-success {
+            background: rgba(25, 135, 84, 0.15);
+            border-color: rgba(25, 135, 84, 0.4);
+        }
+        .password-input-group {
+            position: relative;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .password-toggle:hover {
+            color: #495057;
+        }
+        .password-toggle:focus {
+            outline: none;
+            box-shadow: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+            border: none;
+            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%);
+            box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+        }
+        .btn-outline-primary {
+            border-color: #0d6efd;
+            color: #0d6efd;
+            background: transparent;
+        }
+        .btn-outline-primary:hover {
+            background: #0d6efd;
+            border-color: #0d6efd;
+            color: #ffffff;
+        }
+        .card-title {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+        .text-white-50 {
+            color: rgba(255, 255, 255, 0.8) !important;
+        }
+        h1 {
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="text-center mb-5">
+                    <h1 class="text-white mb-3">Welcome to Exam Management System</h1>
+                    <p class="text-white-50">Please select your campus and enter the password to continue</p>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Note:</strong> All campuses require a password set by the administrator.
+                    </div>
+                </div>
+                
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                <form method="post" id="campusForm">
+                    {% csrf_token %}
+                    <div class="row justify-content-center">
+                        {% for campus in campuses %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card campus-card h-100" data-campus-id="{{ campus.id }}">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">{{ campus.name }}</h5>
+                                    <div class="password-field mt-3">
+                                        <div class="form-group">
+                                            <div class="password-input-group">
+                                                <input type="password" 
+                                                       class="form-control campus-password" 
+                                                       name="password_{{ campus.id }}" 
+                                                       placeholder="Enter campus password"
+                                                       autocomplete="off"
+                                                       required>
+                                                <button type="button" class="password-toggle" onclick="togglePassword(this)">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary mt-2 w-100 access-campus-btn">
+                                            Access Campus
+                                        </button>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-primary mt-2 w-100 select-campus-btn">
+                                        Select Campus
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function togglePassword(button) {
+            const input = button.parentElement.querySelector('input');
+            const icon = button.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const campusCards = document.querySelectorAll('.campus-card');
+            const form = document.getElementById('campusForm');
+            
+            campusCards.forEach(card => {
+                const selectBtn = card.querySelector('.select-campus-btn');
+                const accessBtn = card.querySelector('.access-campus-btn');
+                const campusId = card.dataset.campusId;
+                
+                // Handle "Select Campus" button
+                selectBtn.addEventListener('click', function() {
+                    // Remove selected class from all cards
+                    campusCards.forEach(c => c.classList.remove('campus-selected'));
+                    
+                    // Add selected class to current card
+                    card.classList.add('campus-selected');
+                    
+                    // Add hidden input for campus_id
+                    let hiddenInput = form.querySelector('input[name="campus_id"]');
+                    if (!hiddenInput) {
+                        hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = 'campus_id';
+                        form.appendChild(hiddenInput);
+                    }
+                    hiddenInput.value = campusId;
+                });
+                
+                // Handle "Access Campus" button
+                accessBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // First, select this campus if not already selected
+                    campusCards.forEach(c => c.classList.remove('campus-selected'));
+                    card.classList.add('campus-selected');
+                    
+                    // Add hidden input for campus_id
+                    let hiddenInput = form.querySelector('input[name="campus_id"]');
+                    if (!hiddenInput) {
+                        hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = 'campus_id';
+                        form.appendChild(hiddenInput);
+                    }
+                    hiddenInput.value = campusId;
+                    
+                    // Check if password is entered
+                    const passwordInput = card.querySelector('.campus-password');
+                    if (!passwordInput.value.trim()) {
+                        alert('Please enter the campus password.');
+                        passwordInput.focus();
+                        return;
+                    }
+                    
+                    // Submit the form
+                    form.submit();
+                });
+            });
+        });
+    </script>
+</body>
+</html> 

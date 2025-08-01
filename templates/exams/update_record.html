@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+
+{% block title %}Update Record - Exam Management System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-edit text-warning me-2"></i>
+            Update Exam Record
+        </h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-user-edit me-2"></i>
+                    Edit Record for {{ record.student.name }} - {{ record.unit.name }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" id="updateForm">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.student.id_for_label }}" class="form-label">
+                                <i class="fas fa-user-graduate me-1"></i>Student
+                            </label>
+                            {{ form.student }}
+                            {% if form.student.errors %}
+                                <div class="text-danger small">{{ form.student.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.unit.id_for_label }}" class="form-label">
+                                <i class="fas fa-subject me-1"></i>Unit
+                            </label>
+                            {{ form.unit }}
+                            {% if form.unit.errors %}
+                                <div class="text-danger small">{{ form.unit.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.cat1_score.id_for_label }}" class="form-label">
+                                <i class="fas fa-chart-line me-1"></i>CAT 1 Score
+                                <small class="text-muted">(0-30)</small>
+                            </label>
+                            {{ form.cat1_score }}
+                            {% if form.cat1_score.errors %}
+                                <div class="text-danger small">{{ form.cat1_score.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.cat2_score.id_for_label }}" class="form-label">
+                                <i class="fas fa-chart-line me-1"></i>CAT 2 Score
+                                <small class="text-muted">(0-30)</small>
+                            </label>
+                            {{ form.cat2_score }}
+                            {% if form.cat2_score.errors %}
+                                <div class="text-danger small">{{ form.cat2_score.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.end_term_score.id_for_label }}" class="form-label">
+                                <i class="fas fa-chart-bar me-1"></i>End Term Score
+                                <small class="text-muted">(0-70)</small>
+                            </label>
+                            {{ form.end_term_score }}
+                            {% if form.end_term_score.errors %}
+                                <div class="text-danger small">{{ form.end_term_score.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Real-time Calculation Display -->
+                    <div class="row mt-3">
+                        <div class="col-md-4">
+                            <div class="alert alert-info text-center">
+                                <h6 class="mb-1">CAT Average</h6>
+                                <h4 class="mb-0" id="catAverage">{{ record.cat_average|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="alert alert-success text-center">
+                                <h6 class="mb-1">Total Average</h6>
+                                <h4 class="mb-0" id="totalAverage">{{ record.total_average|floatformat:2 }}</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="alert alert-warning text-center">
+                                <h6 class="mb-1">Grade</h6>
+                                <h4 class="mb-0" id="grade">
+                                    {% if record.total_average >= 80 %}
+                                        A
+                                    {% elif record.total_average >= 70 %}
+                                        B
+                                    {% elif record.total_average >= 60 %}
+                                        C
+                                    {% elif record.total_average >= 50 %}
+                                        D
+                                    {% else %}
+                                        F
+                                    {% endif %}
+                                </h4>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-6">
+                            <a href="{% url 'exams:view_records' %}" class="btn btn-secondary btn-lg w-100">
+                                <i class="fas fa-arrow-left me-2"></i>Cancel
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <button type="submit" class="btn btn-warning btn-lg w-100">
+                                <i class="fas fa-save me-2"></i>Update Record
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Current Record Info -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Current Record Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Student:</strong><br>
+                        {{ record.student.name }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Registration No:</strong><br>
+                        {{ record.student.registration_number }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Course:</strong><br>
+                        {{ record.unit.course.name }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Unit:</strong><br>
+                        {{ record.unit.name }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cat1Input = document.getElementById('{{ form.cat1_score.id_for_label }}');
+    const cat2Input = document.getElementById('{{ form.cat2_score.id_for_label }}');
+    const endTermInput = document.getElementById('{{ form.end_term_score.id_for_label }}');
+    
+    const catAverageDisplay = document.getElementById('catAverage');
+    const totalAverageDisplay = document.getElementById('totalAverage');
+    const gradeDisplay = document.getElementById('grade');
+    
+    function calculateAverages() {
+        const cat1 = parseFloat(cat1Input.value) || 0;
+        const cat2 = parseFloat(cat2Input.value) || 0;
+        const endTerm = parseFloat(endTermInput.value) || 0;
+        
+        // Calculate CAT average
+        const catAverage = (cat1 + cat2) / 2;
+        catAverageDisplay.textContent = catAverage.toFixed(2);
+        
+        // Calculate total average
+        const totalAverage = catAverage + endTerm;
+        totalAverageDisplay.textContent = totalAverage.toFixed(2);
+        
+        // Calculate grade
+        let grade = '-';
+        if (totalAverage >= 80) {
+            grade = 'A';
+        } else if (totalAverage >= 70) {
+            grade = 'B';
+        } else if (totalAverage >= 60) {
+            grade = 'C';
+        } else if (totalAverage >= 50) {
+            grade = 'D';
+        } else if (totalAverage > 0) {
+            grade = 'F';
+        }
+        gradeDisplay.textContent = grade;
+        
+        // Update colors based on performance
+        if (totalAverage >= 70) {
+            totalAverageDisplay.parentElement.className = 'alert alert-success text-center';
+        } else if (totalAverage >= 50) {
+            totalAverageDisplay.parentElement.className = 'alert alert-warning text-center';
+        } else if (totalAverage > 0) {
+            totalAverageDisplay.parentElement.className = 'alert alert-danger text-center';
+        } else {
+            totalAverageDisplay.parentElement.className = 'alert alert-secondary text-center';
+        }
+    }
+    
+    // Add event listeners for real-time calculation
+    cat1Input.addEventListener('input', calculateAverages);
+    cat2Input.addEventListener('input', calculateAverages);
+    endTermInput.addEventListener('input', calculateAverages);
+    
+    // Initial calculation
+    calculateAverages();
+    
+    // Form validation
+    const form = document.getElementById('updateForm');
+    form.addEventListener('submit', function(e) {
+        const cat1 = parseFloat(cat1Input.value) || 0;
+        const cat2 = parseFloat(cat2Input.value) || 0;
+        const endTerm = parseFloat(endTermInput.value) || 0;
+        
+        if (cat1 < 0 || cat1 > 30) {
+            e.preventDefault();
+            alert('CAT 1 score must be between 0 and 30');
+            return;
+        }
+        
+        if (cat2 < 0 || cat2 > 30) {
+            e.preventDefault();
+            alert('CAT 2 score must be between 0 and 30');
+            return;
+        }
+        
+        if (endTerm < 0 || endTerm > 70) {
+            e.preventDefault();
+            alert('End-term score must be between 0 and 70');
+            return;
+        }
+    });
+});
+</script>
+{% endblock %} 

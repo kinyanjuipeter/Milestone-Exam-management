@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+
+{% block title %}Generate Student Progress Report{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-file-word text-primary me-2"></i>
+            Generate Student Progress Report (Transcript)
+        </h2>
+    </div>
+</div>
+
+<form method="post" class="row g-3 mb-5">
+    {% csrf_token %}
+    <div class="col-md-4">
+        <label for="student" class="form-label">Student</label>
+        <select name="student" id="student" class="form-control" required>
+            <option value="">Select Student</option>
+            {% for student in students %}
+                <option value="{{ student.id }}">{{ student.name }} ({{ student.registration_number }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label for="year" class="form-label">Year</label>
+        <select name="year" id="year" class="form-control" required>
+            <option value="">Select Year</option>
+            {% for y in years %}
+                <option value="{{ y }}">{{ y }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label for="term" class="form-label">Term</label>
+        <select name="term" id="term" class="form-control" required>
+            <option value="">Select Term</option>
+            {% for t in terms %}
+                <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-12 mt-3">
+        <button type="submit" class="btn btn-primary btn-lg">
+            <i class="fas fa-search me-2"></i>Generate Preview
+        </button>
+    </div>
+</form>
+
+{% if transcript_preview %}
+    <div class="card card-body mb-3">
+        <h5>Transcript Preview</h5>
+        <p>
+            <strong>Student:</strong> {{ transcript_preview.student.name }}<br>
+            <strong>Reg No:</strong> {{ transcript_preview.student.registration_number }}<br>
+            <strong>School:</strong> {{ transcript_preview.school }}<br>
+            <strong>Level:</strong> {{ transcript_preview.level }}<br>
+            <strong>Year:</strong> {{ transcript_preview.year }}<br>
+            <strong>Term:</strong> {{ transcript_preview.term }}
+        </p>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Unit</th>
+                    <th>CAT</th>
+                    <th>End Term</th>
+                    <th>Average</th>
+                    <th>Remark</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in transcript_preview.results %}
+                <tr>
+                    <td>{{ row.unit }}</td>
+                    <td>{{ row.cat }}</td>
+                    <td>{{ row.end_term }}</td>
+                    <td>{{ row.average }}</td>
+                    <td>{{ row.remark }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p>
+            <strong>Mean Score:</strong> {{ transcript_preview.mean_score }}<br>
+            <strong>Grade:</strong> {{ transcript_preview.grade }}
+        </p>
+    </div>
+    <form method="post" action="{% url 'exams:download_report' %}">
+        {% csrf_token %}
+        <input type="hidden" name="student_id" value="{{ transcript_preview.student.id }}">
+        <input type="hidden" name="year" value="{{ transcript_preview.year }}">
+        <input type="hidden" name="term" value="{{ transcript_preview.term }}">
+        <button type="submit" class="btn btn-primary btn-lg mt-3">
+            <i class="fas fa-download me-2"></i>Download Report (Word)
+        </button>
+    </form>
+{% endif %}
+
+<hr class="my-5">
+
+<div class="row">
+    <div class="col-12">
+        <h4 class="mb-3">
+            <i class="fas fa-list-check text-success me-2"></i>
+            Generate Pass List
+        </h4>
+    </div>
+</div>
+<form method="post" class="row g-3 mb-4">
+    {% csrf_token %}
+    <input type="hidden" name="passlist" value="1">
+    <div class="col-md-4">
+        <label for="passlist_course" class="form-label">Course</label>
+        <select name="passlist_course" id="passlist_course" class="form-select" required>
+            <option value="all" {% if selected_course == 'all' %}selected{% endif %}>All Courses</option>
+            <option value="">Select Course</option>
+            {% for course in courses %}
+            <option value="{{ course.id }}" {% if course == selected_course %}selected{% endif %}>{{ course.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label for="passlist_term" class="form-label">Term</label>
+        <select name="passlist_term" id="passlist_term" class="form-select" required>
+            <option value="">Select Term</option>
+            {% for t in terms %}
+            <option value="{{ t }}" {% if t == selected_term %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label for="passlist_year" class="form-label">Year</label>
+        <select name="passlist_year" id="passlist_year" class="form-select" required>
+            <option value="">Select Year</option>
+            {% for y in years %}
+            <option value="{{ y }}">{{ y }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2 align-self-end">
+        <button type="submit" class="btn btn-outline-success">Generate Pass List</button>
+    </div>
+</form>
+{% if pass_list and selected_year %}
+<div class="table-responsive mb-3">
+    <table class="table table-bordered align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>No.</th>
+                <th>Student Name</th>
+                <th>Reg No</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in pass_list %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ student.name }}</td>
+                <td>{{ student.reg }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<form method="post" action="{% url 'exams:download_pass_list' %}">
+    {% csrf_token %}
+    <input type="hidden" name="course_id" value="{{ selected_course.id }}">
+    <input type="hidden" name="term" value="{{ selected_term }}">
+    <input type="hidden" name="year" value="{{ selected_year }}">
+    <button type="submit" class="btn btn-success">Download as Word</button>
+</form>
+{% elif selected_course and selected_term %}
+    <div class="alert alert-warning">No students found who passed all units for this course and term.</div>
+{% endif %}
+
+{% if pass_debug %}
+<div class="mb-3">
+    <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#passDebugCollapse">Show Pass List Debug Info</button>
+    <div class="collapse" id="passDebugCollapse">
+        <div class="card card-body">
+            <h6>Debug Info (per student):</h6>
+            <ul>
+            {% for s in pass_debug %}
+                <li>
+                    <b>{{ s.student }}</b> ({{ s.reg }}) — Units in course: {{ s.unit_count }}, Records: {{ s.record_count }}<br>
+                    <b>Course Units:</b> {{ s.course_units|join:', ' }}<br>
+                    <b>Recorded Units:</b> {{ s.recorded_units|join:', ' }}<br>
+                    <b>Missing Units:</b> {{ s.missing_units|join:', ' }}<br>
+                    Unit Averages:
+                    <ul>
+                        {% for u in s.unit_averages %}
+                        <li>{{ u.unit }}: {{ u.avg }}</li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %} 

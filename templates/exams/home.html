@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - Exam Management System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="text-center mb-4">
+            <i class="fas fa-graduation-cap text-primary me-3"></i>
+            School Examination Management System
+        </h1>
+        <p class="text-center text-muted mb-5">Efficiently manage student examination records and academic performance</p>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-5">
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-user-graduate fa-3x text-primary mb-3"></i>
+                <h3 class="card-title">{{ total_students }}</h3>
+                <p class="card-text">Total Students</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-book fa-3x text-success mb-3"></i>
+                <h3 class="card-title">{{ total_courses }}</h3>
+                <p class="card-text">Total Courses</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-subject fa-3x text-warning mb-3"></i>
+                <h3 class="card-title">{{ total_units }}</h3>
+                <p class="card-text">Total Units</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-chart-bar fa-3x text-info mb-3"></i>
+                <h3 class="card-title">{{ total_records }}</h3>
+                <p class="card-text">Exam Records</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">Quick Actions</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-edit fa-2x text-primary mb-3"></i>
+                <h5 class="card-title">Enter Exam Marks</h5>
+                <p class="card-text">Add or update examination scores for students in different units.</p>
+                <a href="{% url 'exams:enter_marks' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Enter Marks
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-table fa-2x text-success mb-3"></i>
+                <h5 class="card-title">View Records</h5>
+                <p class="card-text">Browse and search through all examination records with filtering options.</p>
+                <a href="{% url 'exams:view_records' %}" class="btn btn-success">
+                    <i class="fas fa-eye me-2"></i>View Records
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-cog fa-2x text-warning mb-3"></i>
+                <h5 class="card-title">Manage Data</h5>
+                <p class="card-text">Add or modify courses, units, and student information.</p>
+                <div class="btn-group-vertical w-100">
+                    <a href="{% url 'exams:manage_courses' %}" class="btn btn-outline-warning mb-2">
+                        <i class="fas fa-book me-2"></i>Manage Courses
+                    </a>
+                    <a href="{% url 'exams:manage_units' %}" class="btn btn-outline-warning mb-2">
+                        <i class="fas fa-subject me-2"></i>Manage Units
+                    </a>
+                    <a href="{% url 'exams:manage_students' %}" class="btn btn-outline-warning">
+                        <i class="fas fa-user-graduate me-2"></i>Manage Students
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div class="row mt-5">
+    <div class="col-12">
+        <h2 class="mb-4">System Features</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="d-flex">
+            <i class="fas fa-check-circle text-success fa-lg me-3 mt-1"></i>
+            <div>
+                <h6>Automatic Grade Calculation</h6>
+                <p class="text-muted">CAT average and total average are calculated automatically</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="d-flex">
+            <i class="fas fa-check-circle text-success fa-lg me-3 mt-1"></i>
+            <div>
+                <h6>Data Validation</h6>
+                <p class="text-muted">Ensures scores are within valid ranges (CAT: 0-30, End-term: 0-70)</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="d-flex">
+            <i class="fas fa-check-circle text-success fa-lg me-3 mt-1"></i>
+            <div>
+                <h6>Search & Filter</h6>
+                <p class="text-muted">Find records by student, course, or unit with advanced filtering</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="d-flex">
+            <i class="fas fa-check-circle text-success fa-lg me-3 mt-1"></i>
+            <div>
+                <h6>Real-time Updates</h6>
+                <p class="text-muted">Instant calculation of averages as you enter scores</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

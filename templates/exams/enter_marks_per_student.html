@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block title %}Enter Marks Per Student - Exam Management System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 col-md-8 offset-md-2">
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-user-edit me-2"></i>Enter Marks Per Student
+                </h4>
+            </div>
+            <div class="card-body">
+                {% if message %}
+                    <div class="alert alert-success">{{ message }}</div>
+                {% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="student" class="form-label">Student</label>
+                            <select name="student" id="student" class="form-control" required {% if selected_student %}disabled{% endif %}>
+                                <option value="">Select Student</option>
+                                {% for s in students %}
+                                    <option value="{{ s.id }}" {% if selected_student and s.id == selected_student.id %}selected{% endif %}>{{ s.name }} ({{ s.registration_number }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="year" class="form-label">Year</label>
+                            <select name="year" id="year" class="form-control" required {% if selected_year %}disabled{% endif %}>
+                                <option value="">Select Year</option>
+                                {% for y in years %}
+                                    <option value="{{ y }}" {% if selected_year and y|stringformat:'s' == selected_year|stringformat:'s' %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="term" class="form-label">Term</label>
+                            <select name="term" id="term" class="form-control" required {% if selected_term %}disabled{% endif %}>
+                                <option value="">Select Term</option>
+                                {% for t in terms %}
+                                    <option value="{{ t }}" {% if selected_term and t == selected_term %}selected{% endif %}>{{ t }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    {% if not selected_student or not selected_year or not selected_term %}
+                        <button type="submit" name="select_student" class="btn btn-primary w-100">Next</button>
+                    {% endif %}
+                </form>
+                {% if selected_student and selected_year and selected_term %}
+                <hr>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="student_id" value="{{ selected_student.id }}">
+                    <input type="hidden" name="year" value="{{ selected_year }}">
+                    <input type="hidden" name="term" value="{{ selected_term }}">
+                    <div class="mb-3 row">
+                        <div class="col-md-6">
+                            <label for="school" class="form-label">School</label>
+                            <input type="text" name="school" id="school" class="form-control" value="{{ records.values.0.school|default_if_none:'' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="level" class="form-label">Level</label>
+                            <input type="text" name="level" id="level" class="form-control" value="{{ records.values.0.level|default_if_none:'' }}" required>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle text-center mx-auto" style="width: auto;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Unit</th>
+                                    <th>CAT 1</th>
+                                    <th>CAT 2</th>
+                                    <th>End Term</th>
+                                </tr>
+                            </thead>
+                            <tbody id="units-table-body">
+                                <tr>
+                                    <td>
+                                        <input type="text" name="unit_name_1" class="form-control" list="unit-list" required>
+                                    </td>
+                                    <td><input type="number" name="cat1_1" class="form-control" min="0" max="30" step="0.01"></td>
+                                    <td><input type="number" name="cat2_1" class="form-control" min="0" max="30" step="0.01"></td>
+                                    <td><input type="number" name="endterm_1" class="form-control" min="0" max="70" step="0.01"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <datalist id="unit-list">
+                            {% for unit in all_units %}
+                                <option value="{{ unit.name }}">{{ unit.name }}</option>
+                            {% endfor %}
+                        </datalist>
+                        <div class="text-center">
+                            <button type="button" id="add-row-btn" class="btn btn-secondary mt-2">Add Unit</button>
+                        </div>
+                    </div>
+                    <button type="submit" name="save_marks" class="btn btn-success w-100">Save Marks</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, looking for add-row-btn...');
+    const addButton = document.getElementById('add-row-btn');
+    console.log('Add button found:', addButton);
+    
+    if (addButton) {
+        let rowCount = 1;
+        addButton.addEventListener('click', function() {
+            console.log('Add button clicked!');
+            rowCount++;
+            const tbody = document.getElementById('units-table-body');
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+                <td>
+                    <input type="text" name="unit_name_${rowCount}" class="form-control" list="unit-list" required>
+                </td>
+                <td><input type="number" name="cat1_${rowCount}" class="form-control" min="0" max="30" step="0.01"></td>
+                <td><input type="number" name="cat2_${rowCount}" class="form-control" min="0" max="30" step="0.01"></td>
+                <td><input type="number" name="endterm_${rowCount}" class="form-control" min="0" max="70" step="0.01"></td>
+            `;
+            tbody.appendChild(newRow);
+            console.log('New row added, total rows:', rowCount);
+        });
+        console.log('Event listener attached to add button');
+    } else {
+        console.error('Add button not found!');
+    }
+});
+</script>
+{% endblock %} 
