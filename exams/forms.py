@@ -7,9 +7,10 @@ class CourseForm(forms.ModelForm):
     """Form for creating and editing courses."""
     class Meta:
         model = Course
-        fields = ['name']
+        fields = ['name', 'school']
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter course name'})
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter course name'}),
+            'school': forms.Select(attrs={'class': 'form-control'})
         }
 
 

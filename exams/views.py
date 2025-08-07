@@ -1,15 +1,17 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
 from django.contrib.auth.decorators import user_passes_test
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import Course, Unit, Student, ExamRecord, Campus, CampusPassword
+from .models import Course, Unit, Student, ExamRecord, Campus, CampusPassword, School
 from .forms import ExamRecordForm, CourseForm, UnitForm, StudentForm
 from docx import Document
 from docx.shared import Inches, Pt
@@ -113,23 +115,24 @@ def home(request):
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
     
-    # Get counts for dashboard
-    if request.user.is_superuser:
-        total_students = Student.objects.count()
-        total_units = Unit.objects.count()
-        total_records = ExamRecord.objects.count()
-        total_courses = Course.objects.count()
+    # Get counts for dashboard - respect campus selection for both superusers and regular users
+    if current_campus:
+        total_students = Student.objects.filter(course__school__campus=current_campus).count()
+        total_units = Unit.objects.filter(course__school__campus=current_campus).count()
+        total_records = ExamRecord.objects.filter(student__course__school__campus=current_campus).count()
+        total_courses = Course.objects.filter(school__campus=current_campus).count()
+        recent_records = ExamRecord.objects.select_related('student', 'unit').filter(student__course__school__campus=current_campus).order_by('-id')[:5]
     else:
-        total_students = Student.objects.filter(campus=current_campus).count()
-        total_units = Unit.objects.filter(campus=current_campus).count()
-        total_records = ExamRecord.objects.filter(campus=current_campus).count()
-        total_courses = Course.objects.filter(campus=current_campus).count()
-    
-    # Get recent records
-    if request.user.is_superuser:
-        recent_records = ExamRecord.objects.select_related('student', 'unit').order_by('-id')[:5]
-    else:
-        recent_records = ExamRecord.objects.select_related('student', 'unit').filter(campus=current_campus).order_by('-id')[:5]
+        # If no campus is selected and user is superuser, show all records
+        if request.user.is_superuser:
+            total_students = Student.objects.count()
+            total_units = Unit.objects.count()
+            total_records = ExamRecord.objects.count()
+            total_courses = Course.objects.count()
+            recent_records = ExamRecord.objects.select_related('student', 'unit').order_by('-id')[:5]
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
     context = {
         'total_students': total_students,
@@ -146,209 +149,173 @@ def enter_marks(request):
     current_campus = get_current_campus(request)
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
-    
-    if request.user.is_superuser:
-        students = Student.objects.all()
-        courses = Course.objects.all()
-        units = Unit.objects.all()
+    if current_campus:
+        students = Student.objects.filter(course__school__campus=current_campus)
+        courses = Course.objects.filter(school__campus=current_campus)
+        units = Unit.objects.filter(course__school__campus=current_campus)
+        schools = School.objects.filter(campus=current_campus)
     else:
-        students = Student.objects.filter(campus=current_campus)
-        courses = Course.objects.filter(campus=current_campus)
-        units = Unit.objects.filter(campus=current_campus)
-
-    if request.method == 'POST':
-        # Handle bulk entry
-        if 'bulk_save' in request.POST:
-            course_id = request.POST.get('course')
-            school = request.POST.get('school')
-            unit_id = request.POST.get('unit')
-            term = request.POST.get('term')
-            level = request.POST.get('level')
-            year = request.POST.get('year')
-            
-            if not all([course_id, school, unit_id, term, level, year]):
-                messages.error(request, 'All fields are required for bulk entry.')
-                return redirect('exams:enter_marks')
-            
-            try:
-                # Handle course - create if it's a new course name
-                if course_id.isdigit():
-                    course = Course.objects.get(id=course_id)
-                else:
-                    # Create new course
-                    course, created = Course.objects.get_or_create(
-                        name=course_id,
-                        campus=current_campus,
-                        defaults={'campus': current_campus}
-                    )
-                    if created:
-                        messages.success(request, f'Created new course: {course.name}')
-                
-                # Handle unit - create if it's a new unit name
-                if unit_id.isdigit():
-                    unit = Unit.objects.get(id=unit_id)
-                else:
-                    # Create new unit
-                    unit, created = Unit.objects.get_or_create(
-                        name=unit_id,
-                        course=course,
-                        campus=current_campus,
-                        defaults={'course': course, 'campus': current_campus}
-                    )
-                    if created:
-                        messages.success(request, f'Created new unit: {unit.name}')
-                
-                # Get all students for the selected course
-                course_students = students.filter(course=course)
-                
-                saved_count = 0
-                for student in course_students:
-                    cat1_key = f'cat1_{student.id}'
-                    cat2_key = f'cat2_{student.id}'
-                    endterm_key = f'endterm_{student.id}'
-                    
-                    cat1_score = request.POST.get(cat1_key, '')
-                    cat2_score = request.POST.get(cat2_key, '')
-                    endterm_score = request.POST.get(endterm_key, '')
-                    
-                    # Only save if at least one score is provided
-                    if cat1_score or cat2_score or endterm_score:
-                        record, created = ExamRecord.objects.get_or_create(
-                            student=student,
-                            unit=unit,
-                            year=year,
-                            term=term,
-                            defaults={
-                                'school': school,
-                                'level': level,
-                                'cat1_score': safe_decimal(cat1_score),
-                                'cat2_score': safe_decimal(cat2_score),
-                                'end_term_score': safe_decimal(endterm_score),
-                                'campus': current_campus or student.campus,
-                            }
-                        )
-                        
-                        if not created:
-                            # Update existing record
-                            record.cat1_score = safe_decimal(cat1_score)
-                            record.cat2_score = safe_decimal(cat2_score)
-                            record.end_term_score = safe_decimal(endterm_score)
-                            record.school = school
-                            record.level = level
-                            record.save()
-                        
-                        saved_count += 1
-                
-                # Handle new students added dynamically
-                for key, value in request.POST.items():
-                    if key.startswith('cat1_new_') and value.strip():
-                        # Extract student info from the form
-                        temp_id = key.replace('cat1_new_', '')
-                        student_name_key = f'student_name_{temp_id}'
-                        admission_number_key = f'admission_number_{temp_id}'
-                        
-                        student_name = request.POST.get(student_name_key, '')
-                        admission_number = request.POST.get(admission_number_key, '')
-                        
-                        if student_name and admission_number:
-                            # Create new student
-                            new_student, created = Student.objects.get_or_create(
-                                registration_number=admission_number,
-                                defaults={
-                                    'name': student_name,
-                                    'course': course,
-                                    'campus': current_campus,
-                                }
-                            )
-                            if created:
-                                messages.success(request, f'Created new student: {new_student.name}')
-                            
-                            # Get scores for this new student
-                            cat1_score = request.POST.get(f'cat1_new_{temp_id}', '')
-                            cat2_score = request.POST.get(f'cat2_new_{temp_id}', '')
-                            endterm_score = request.POST.get(f'endterm_new_{temp_id}', '')
-                            
-                            if cat1_score or cat2_score or endterm_score:
-                                record, created = ExamRecord.objects.get_or_create(
-                                    student=new_student,
-                                    unit=unit,
-                                    year=year,
-                                    term=term,
-                                    defaults={
-                                        'school': school,
-                                        'level': level,
-                                        'cat1_score': safe_decimal(cat1_score),
-                                        'cat2_score': safe_decimal(cat2_score),
-                                        'end_term_score': safe_decimal(endterm_score),
-                                        'campus': current_campus,
-                                    }
-                                )
-                                
-                                if not created:
-                                    # Update existing record
-                                    record.cat1_score = safe_decimal(cat1_score)
-                                    record.cat2_score = safe_decimal(cat2_score)
-                                    record.end_term_score = safe_decimal(endterm_score)
-                                    record.school = school
-                                    record.level = level
-                                    record.save()
-                                
-                                saved_count += 1
-                
-                if saved_count > 0:
-                    messages.success(request, f'Successfully saved marks for {saved_count} students!')
-                else:
-                    messages.warning(request, 'No marks were saved. Please enter at least one score.')
-                    
-            except (Course.DoesNotExist, Unit.DoesNotExist):
-                messages.error(request, 'Invalid course or unit selected.')
-            
-            return redirect('exams:enter_marks')
-        
-        # Handle single entry (existing functionality)
+        if request.user.is_superuser:
+            students = Student.objects.all()
+            courses = Course.objects.all()
+            units = Unit.objects.all()
+            schools = School.objects.all()
         else:
-            form = ExamRecordForm(request.POST)
-            if form.is_valid():
-                record = form.save(commit=False)
-                record.campus = current_campus or record.student.campus
-                record.save()
-                messages.success(request, 'Marks saved successfully!')
-                form = ExamRecordForm()  # Reset form
+            return redirect('exams:campus_select')
+    years = [2025, 2024, 2023, 2022, 2021]
+    terms = ['Term 1', 'Term 2', 'Term 3', 'Term 4']
+    selected_student = None
+    selected_year = None
+    selected_term = None
+    unit_marks = []
+    available_units = []
+    message = ''
+    if request.method == 'POST' and 'select_student' in request.POST:
+        student_id = request.POST.get('student_id')
+        year = request.POST.get('year')
+        term = request.POST.get('term')
+        selected_student = get_object_or_404(Student, id=student_id)
+        selected_year = year
+        selected_term = term
+        all_units = list(Unit.objects.filter(course=selected_student.course))
+        entered_units = []
+        for unit in all_units:
+            rec = ExamRecord.objects.filter(student=selected_student, unit=unit, year=year, term=term).first()
+            if rec:
+                unit_marks.append({
+                    'unit': unit,
+                    'cat1': rec.cat1_score,
+                    'cat2': rec.cat2_score,
+                    'endterm': rec.end_term_score,
+                    'has_record': True,
+                })
+                entered_units.append(unit.id)
+        available_units = [u for u in all_units if u.id not in entered_units]
+    elif request.method == 'POST' and 'save_marks' in request.POST:
+        student_id = request.POST.get('student_id')
+        year = request.POST.get('year')
+        term = request.POST.get('term')
+        selected_student = get_object_or_404(Student, id=student_id)
+        selected_year = year
+        selected_term = term
+        school = request.POST.get('school')
+        level = request.POST.get('level')
+        i = 1
+        entered_units = []
+        while True:
+            unit_id = request.POST.get(f'unit_id_{i}')
+            unit_name = request.POST.get(f'unit_name_{i}', '').strip()
+            if not unit_id:
+                break
+            cat1 = request.POST.get(f'cat1_{i}')
+            cat2 = request.POST.get(f'cat2_{i}')
+            endterm = request.POST.get(f'endterm_{i}')
+            cat1_val = safe_decimal(cat1)
+            cat2_val = safe_decimal(cat2)
+            endterm_val = safe_decimal(endterm)
+            if unit_id == 'other' and unit_name:
+                unit, _ = Unit.objects.get_or_create(
+                    name=unit_name,
+                    course=selected_student.course
+                )
             else:
-                messages.error(request, 'Please correct the errors below.')
-    else:
-        form = ExamRecordForm()
-    
-    # Filter form choices based on campus
-    if not request.user.is_superuser:
-        form.fields['student'].queryset = students
-        form.fields['unit'].queryset = units
-    
-    # Prepare students data for JavaScript
-    students_data = {}
-    for course in courses:
-        course_students = students.filter(course=course)
-        students_data[course.id] = [
-            {
-                'id': student.id,
-                'name': student.name,
-                'registration_number': student.registration_number
-            }
-            for student in course_students
-        ]
-    
+                unit = Unit.objects.get(id=unit_id)
+            record, _ = ExamRecord.objects.get_or_create(
+                student=selected_student,
+                unit=unit,
+                year=year,
+                term=term,
+                defaults={
+                    'cat1_score': cat1_val,
+                    'cat2_score': cat2_val,
+                    'end_term_score': endterm_val,
+                }
+            )
+            record.cat1_score = cat1_val
+            record.cat2_score = cat2_val
+            record.end_term_score = endterm_val
+            record.save()
+            entered_units.append(unit.id)
+            i += 1
+        message = 'Marks saved successfully!'
+        unit_marks = []
+        all_units = list(Unit.objects.filter(course=selected_student.course))
+        for unit in all_units:
+            rec = ExamRecord.objects.filter(student=selected_student, unit=unit, year=year, term=term).first()
+            if rec:
+                unit_marks.append({
+                    'unit': unit,
+                    'cat1': rec.cat1_score,
+                    'cat2': rec.cat2_score,
+                    'endterm': rec.end_term_score,
+                    'has_record': True,
+                })
+        available_units = [u for u in all_units if u.id not in entered_units]
     context = {
-        'form': form,
         'students': students,
         'courses': courses,
         'units': units,
-        'students_data_json': json.dumps(students_data),
+        'schools': schools,
+        'years': years,
+        'terms': terms,
+        'selected_student': selected_student,
+        'selected_year': selected_year,
+        'selected_term': selected_term,
+        'unit_marks': unit_marks,
+        'available_units': available_units,
+        'message': message,
         'current_campus': current_campus,
-        'years': range(2020, 2031),  # Years 2020-2030
-        'terms': ['Term 1', 'Term 2', 'Term 3'],
-        'levels': ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Level 6', 'Level 7', 'Level 8'],
     }
     return render(request, 'exams/enter_marks.html', context)
+
+
+def get_existing_marks(request):
+    """AJAX endpoint to get existing marks for students"""
+    if request.method == 'GET':
+        course_id = request.GET.get('course_id')
+        unit_id = request.GET.get('unit_id')
+        term = request.GET.get('term')
+        year = request.GET.get('year')
+        
+        if not all([course_id, unit_id, term, year]):
+            return JsonResponse({'error': 'Missing required parameters'}, status=400)
+        
+        try:
+            course = Course.objects.get(id=course_id)
+            unit = Unit.objects.get(id=unit_id)
+            
+            # Get students for this course
+            students = Student.objects.filter(course=course)
+            
+            # Get existing marks for these students for the specified unit, term, and year
+            existing_marks = {}
+            for student in students:
+                record = ExamRecord.objects.filter(
+                    student=student,
+                    unit=unit,
+                    term=term,
+                    year=year
+                ).first()
+                
+                if record:
+                    existing_marks[student.id] = {
+                        'cat1_score': float(record.cat1_score) if record.cat1_score else '',
+                        'cat2_score': float(record.cat2_score) if record.cat2_score else '',
+                        'end_term_score': float(record.end_term_score) if record.end_term_score else ''
+                    }
+                else:
+                    existing_marks[student.id] = {
+                        'cat1_score': '',
+                        'cat2_score': '',
+                        'end_term_score': ''
+                    }
+            
+            return JsonResponse({'existing_marks': existing_marks})
+            
+        except (Course.DoesNotExist, Unit.DoesNotExist):
+            return JsonResponse({'error': 'Invalid course or unit'}, status=400)
+    
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 
 def view_records(request):
@@ -356,10 +323,16 @@ def view_records(request):
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
     
-    if request.user.is_superuser:
-        records = ExamRecord.objects.select_related('student', 'unit', 'unit__course').all()
+    # For both superusers and regular users, filter by campus if one is selected
+    if current_campus:
+        records = ExamRecord.objects.select_related('student', 'unit', 'unit__course').filter(student__course__school__campus=current_campus)
     else:
-        records = ExamRecord.objects.select_related('student', 'unit', 'unit__course').filter(campus=current_campus)
+        # If no campus is selected and user is superuser, show all records
+        if request.user.is_superuser:
+            records = ExamRecord.objects.select_related('student', 'unit', 'unit__course').all()
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
     # Filtering
     student_filter = request.GET.get('student')
@@ -387,15 +360,30 @@ def view_records(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # For filter dropdowns
-    years = ExamRecord.objects.values_list('year', flat=True).distinct().order_by('year')
-    terms = ExamRecord.objects.values_list('term', flat=True).distinct().order_by('term')
+    # For filter dropdowns - respect campus selection
+    if current_campus:
+        years = ExamRecord.objects.filter(student__course__school__campus=current_campus).values_list('year', flat=True).distinct().order_by('year')
+        terms = ExamRecord.objects.filter(student__course__school__campus=current_campus).values_list('term', flat=True).distinct().order_by('term')
+        courses = Course.objects.filter(school__campus=current_campus)
+        units = Unit.objects.filter(course__school__campus=current_campus)
+        students = Student.objects.filter(course__school__campus=current_campus)
+    else:
+        # If no campus is selected and user is superuser, show all
+        if request.user.is_superuser:
+            years = ExamRecord.objects.values_list('year', flat=True).distinct().order_by('year')
+            terms = ExamRecord.objects.values_list('term', flat=True).distinct().order_by('term')
+            courses = Course.objects.all()
+            units = Unit.objects.all()
+            students = Student.objects.all()
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
     context = {
         'page_obj': page_obj,
-        'courses': Course.objects.all(),
-        'units': Unit.objects.all(),
-        'students': Student.objects.all(),
+        'courses': courses,
+        'units': units,
+        'students': students,
         'years': years,
         'terms': terms,
         'filters': {
@@ -440,35 +428,162 @@ def manage_courses(request):
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
     
-    if request.user.is_superuser:
-        courses = Course.objects.all()
-    else:
-        courses = Course.objects.filter(campus=current_campus)
+    # Get all schools with their campuses
+    schools = School.objects.select_related('campus').all().order_by('name')
     
-    if request.method == 'POST':
+    # Get comprehensive course data with all relationships
+    courses = Course.objects.select_related(
+        'school',
+        'school__campus'
+    ).prefetch_related(
+        'units',
+        'students',
+        'units__exam_records'
+    ).annotate(
+        unit_count=Count('units'),
+        student_count=Count('students')
+    ).order_by('-created_at')
+
+    # Detailed debug logging
+    print("\n=== COURSE ANALYSIS DEBUG ===")
+    print(f"Total courses found: {courses.count()}")
+    for i, course in enumerate(courses, 1):
+        print(f"\nCourse #{i}: {course.name}")
+        print(f"School: {course.school.name if course.school else 'None'}")
+        print(f"Campus: {course.school.campus.name if course.school and course.school.campus else 'None'}")
+        print(f"Units: {course.unit_count}")
+        print(f"Students: {course.student_count}")
+        if course.units.exists():
+            print("Unit Details:")
+            for unit in course.units.all():
+                print(f"  - {unit.name}: {unit.exam_records.count()} records")
+
+    # Apply campus filter if a campus is selected
+    if current_campus:
+        courses = courses.filter(school__campus=current_campus)
+        schools = schools.filter(campus=current_campus)
+        print(f"\nFiltered to {current_campus.name} campus: {courses.count()} courses")
+    
+    # Handle course creation
+    if request.method == 'POST' and 'create_course' in request.POST:
         form = CourseForm(request.POST)
         if form.is_valid():
             course = form.save(commit=False)
-            # Set the campus for the new course
-            if current_campus:
-                course.campus = current_campus
-            else:
-                # For superusers, we need to handle the case where no campus is selected
-                # For now, we'll require them to select a campus or create a default one
-                if not Campus.objects.exists():
-                    messages.error(request, 'No campus found. Please create a campus first.')
+            school_id = request.POST.get('school')
+            
+            if not school_id:
+                messages.error(request, 'Please select a school')
+                return redirect('exams:manage_courses')
+                
+            try:
+                school = School.objects.get(id=school_id)
+                
+                # Check if course with same name already exists in this school
+                existing_course = Course.objects.filter(
+                    name__iexact=course.name,
+                    school=school
+                ).first()
+                
+                if existing_course:
+                    messages.error(request, f'Course "{course.name}" already exists in {school.name}')
                     return redirect('exams:manage_courses')
-                # Use the first available campus as default for superusers
-                course.campus = Campus.objects.first()
-            course.save()
-            messages.success(request, 'Course created successfully!')
+                
+                course.school = school  # Explicitly set school relationship
+                course.save()
+                
+                # Debug output
+                print(f"\nDEBUG: Created course - Name: {course.name}")
+                print(f"School: {course.school.name if course.school else 'None'}")
+                print(f"Campus: {course.school.campus.name if course.school and course.school.campus else 'None'}")
+                print(f"Created at: {course.created_at}")
+                
+                messages.success(request, f'Course "{course.name}" created successfully for {school.name}!')
+                return redirect('exams:manage_courses')
+                
+            except School.DoesNotExist:
+                messages.error(request, 'Selected school does not exist')
+                return redirect('exams:manage_courses')
+            except IntegrityError:
+                messages.error(request, f'Course "{course.name}" already exists in {school.name}')
+                return redirect('exams:manage_courses')
+    
+    # Handle school creation
+    elif request.method == 'POST' and 'create_school' in request.POST:
+        school_name = request.POST.get('school_name', '').strip()
+        if school_name:
+            from django.db import transaction
+            
+            try:
+                # First ensure we have a valid campus
+                campus = current_campus or Campus.objects.first()
+                if not campus:
+                    messages.error(request, 'No campus available. Please create a campus first.')
+                    return redirect('exams:manage_courses')
+
+                with transaction.atomic():
+                    # Check for existing school (case-insensitive) with same name AND campus
+                    existing_school = School.objects.filter(
+                        name__iexact=school_name,
+                        campus=campus
+                    ).first()
+                    
+                    if existing_school:
+                        messages.error(request, f'School "{school_name}" already exists for {campus.name} campus')
+                    else:
+                        # Create new school
+                        school = School.objects.create(
+                            name=school_name,
+                            campus=campus
+                        )
+                        messages.success(request, f'School "{school.name}" created successfully for {campus.name} campus!')
+                
+                return redirect('exams:manage_courses')
+                
+            except IntegrityError as e:
+                # Check if school already exists for this campus
+                existing = School.objects.filter(name__iexact=school_name, campus=campus).exists()
+                if existing:
+                    messages.error(request, f'School "{school_name}" already exists for {campus.name} campus')
+                else:
+                    messages.error(request, 'Database error occurred. Please try again with a different name.')
+                return redirect('exams:manage_courses')
+            except Exception as e:
+                import traceback
+                print(f"Error creating school: {str(e)}\n{traceback.format_exc()}")
+                messages.error(request, 'An unexpected error occurred. Please try again.')
+                return redirect('exams:manage_courses')
+        else:
+            messages.error(request, 'School name is required')
             return redirect('exams:manage_courses')
+    
+    # Handle course deletion
+    elif request.method == 'POST' and 'delete_course' in request.POST:
+        course_id = request.POST.get('course_id')
+        try:
+            course = Course.objects.get(id=course_id)
+            course_name = course.name
+            course.delete()
+            messages.success(request, f'Course "{course_name}" deleted successfully!')
+        except Course.DoesNotExist:
+            messages.error(request, 'Course not found')
+        return redirect('exams:manage_courses')
+            
     else:
         form = CourseForm()
+    
+    # Debug output for template context
+    print("\n=== TEMPLATE CONTEXT DEBUG ===")
+    print(f"Passing {courses.count()} courses to template")
+    for i, course in enumerate(courses, 1):
+        print(f"Course {i}: {course.name} (ID: {course.id})")
+        print(f"  School: {course.school.name if course.school else 'None'}")
+        print(f"  Units: {course.units.count()}")
+        print(f"  Students: {course.students.count()}")
     
     context = {
         'form': form,
         'courses': courses,
+        'schools': schools,
         'current_campus': current_campus,
     }
     return render(request, 'exams/manage_courses.html', context)
@@ -479,27 +594,23 @@ def manage_units(request):
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
     
-    if request.user.is_superuser:
-        units = Unit.objects.select_related('course').all()
-        courses = Course.objects.all()
+    # Respect campus selection for both superusers and regular users
+    if current_campus:
+        units = Unit.objects.select_related('course').filter(course__school__campus=current_campus)
+        courses = Course.objects.filter(school__campus=current_campus)
     else:
-        units = Unit.objects.select_related('course').filter(campus=current_campus)
-        courses = Course.objects.filter(campus=current_campus)
+        # If no campus is selected and user is superuser, show all
+        if request.user.is_superuser:
+            units = Unit.objects.select_related('course').all()
+            courses = Course.objects.all()
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
     if request.method == 'POST':
         form = UnitForm(request.POST)
         if form.is_valid():
-            unit = form.save(commit=False)
-            # Set the campus for the new unit
-            if current_campus:
-                unit.campus = current_campus
-            else:
-                # For superusers, use the first available campus as default
-                if not Campus.objects.exists():
-                    messages.error(request, 'No campus found. Please create a campus first.')
-                    return redirect('exams:manage_units')
-                unit.campus = Campus.objects.first()
-            unit.save()
+            unit = form.save()
             messages.success(request, 'Unit created successfully!')
             return redirect('exams:manage_units')
     else:
@@ -523,27 +634,23 @@ def manage_students(request):
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
     
-    if request.user.is_superuser:
-        students = Student.objects.select_related('course').all()
-        courses = Course.objects.all()
+    # Respect campus selection for both superusers and regular users
+    if current_campus:
+        students = Student.objects.select_related('course').filter(course__school__campus=current_campus)
+        courses = Course.objects.filter(school__campus=current_campus)
     else:
-        students = Student.objects.select_related('course').filter(campus=current_campus)
-        courses = Course.objects.filter(campus=current_campus)
+        # If no campus is selected and user is superuser, show all
+        if request.user.is_superuser:
+            students = Student.objects.select_related('course').all()
+            courses = Course.objects.all()
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
     if request.method == 'POST':
         form = StudentForm(request.POST)
         if form.is_valid():
-            student = form.save(commit=False)
-            # Set the campus for the new student
-            if current_campus:
-                student.campus = current_campus
-            else:
-                # For superusers, use the first available campus as default
-                if not Campus.objects.exists():
-                    messages.error(request, 'No campus found. Please create a campus first.')
-                    return redirect('exams:manage_students')
-                student.campus = Campus.objects.first()
-            student.save()
+            student = form.save()
             messages.success(request, 'Student created successfully!')
             return redirect('exams:manage_students')
     else:
@@ -578,10 +685,16 @@ def update_student(request, student_id):
     else:
         form = StudentForm(instance=student)
     
-    if request.user.is_superuser:
-        courses = Course.objects.all()
+    # Respect campus selection for both superusers and regular users
+    if current_campus:
+        courses = Course.objects.filter(school__campus=current_campus)
     else:
-        courses = Course.objects.filter(campus=current_campus)
+        # If no campus is selected and user is superuser, show all
+        if request.user.is_superuser:
+            courses = Course.objects.all()
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
     context = {
         'form': form,
@@ -617,16 +730,22 @@ def generate_report(request):
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
     
-    if request.user.is_superuser:
-        courses = Course.objects.all()
-        students = Student.objects.all()
-        years = ExamRecord.objects.values_list('year', flat=True).distinct().order_by('year')
-        terms = ExamRecord.objects.values_list('term', flat=True).distinct().order_by('term')
+    # Respect campus selection for both superusers and regular users
+    if current_campus:
+        courses = Course.objects.filter(school__campus=current_campus)
+        students = Student.objects.filter(course__school__campus=current_campus)
+        years = ExamRecord.objects.filter(student__course__school__campus=current_campus).values_list('year', flat=True).distinct().order_by('year')
+        terms = ExamRecord.objects.filter(student__course__school__campus=current_campus).values_list('term', flat=True).distinct().order_by('term')
     else:
-        courses = Course.objects.filter(campus=current_campus)
-        students = Student.objects.filter(campus=current_campus)
-        years = ExamRecord.objects.filter(campus=current_campus).values_list('year', flat=True).distinct().order_by('year')
-        terms = ExamRecord.objects.filter(campus=current_campus).values_list('term', flat=True).distinct().order_by('term')
+        # If no campus is selected and user is superuser, show all
+        if request.user.is_superuser:
+            courses = Course.objects.all()
+            students = Student.objects.all()
+            years = ExamRecord.objects.values_list('year', flat=True).distinct().order_by('year')
+            terms = ExamRecord.objects.values_list('term', flat=True).distinct().order_by('term')
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
     pass_list = []
     selected_course = None
@@ -641,8 +760,6 @@ def generate_report(request):
         term = request.POST.get('term')
         student = Student.objects.get(id=student_id)
         records = ExamRecord.objects.filter(student=student, year=year, term=term).select_related('unit', 'unit__course')
-        school = records[0].school if records and records[0].school else ''
-        level = records[0].level if records and records[0].level else ''
         
         if not records.exists():
             messages.error(request, 'No records found for this student, year, and term.')
@@ -665,6 +782,7 @@ def generate_report(request):
                     'unit': rec.unit.name,
                     'cat1': rec.cat1_score,
                     'cat2': rec.cat2_score,
+                    'cat': cat_avg,
                     'end_term': rec.end_term_score,
                     'average': avg,
                     'remark': remark,
@@ -673,8 +791,6 @@ def generate_report(request):
             mean_score = mean_total // len(records) if records else 0
             transcript_preview = {
                 'student': student,
-                'school': school,
-                'level': level,
                 'year': year,
                 'term': term,
                 'results': results,
@@ -688,6 +804,7 @@ def generate_report(request):
         'terms': terms,
         'transcript_preview': transcript_preview,
         'current_campus': current_campus,
+        'dashboard_url': reverse('exams:campus_select'),
     }
     return render(request, 'exams/generate_report.html', context)
 
@@ -719,8 +836,6 @@ def download_report(request):
             student_name = student.name
             admission_number = student.registration_number
             course_name = student.course.name
-            school = records.first().school if records.first().school else ''
-            level = records.first().level if records.first().level else ''
             
         except Student.DoesNotExist:
             messages.error(request, 'Student not found.')
@@ -731,7 +846,7 @@ def download_report(request):
         if request.user.is_superuser:
             records = ExamRecord.objects.all()
         else:
-            records = ExamRecord.objects.filter(campus=current_campus)
+            records = ExamRecord.objects.filter(student__course__school__campus=current_campus)
         
         # Filtering
         student_filter = request.GET.get('student')
@@ -768,8 +883,6 @@ def download_report(request):
                 admission_number = first_record.student.registration_number
             if not course_name:
                 course_name = first_record.unit.course.name
-            school = first_record.school if first_record.school else ''
-            level = first_record.level if first_record.level else ''
             if not year:
                 year = str(first_record.year)
             if not term:
@@ -782,12 +895,14 @@ def download_report(request):
     section.bottom_margin = Inches(0.3)
     section.left_margin = Inches(0.3)
     section.right_margin = Inches(0.3)
-    
+
     # HEADER IMAGE (full width, very top)
     try:
-        doc.add_picture('C:/Users/PETER/Desktop/exam mangement/report/head.jpg', width=Inches(7.0))
+        doc.add_picture('report/head.jpg', width=Inches(7.0))
     except FileNotFoundError:
         doc.add_paragraph("Header image not found.")
+
+
 
     # TITLE
     p = doc.add_paragraph()
@@ -805,11 +920,6 @@ def download_report(request):
     p = doc.add_paragraph()
     p.add_run("COURSE:").bold = True
     p.add_run(f" {course_name or '..................................................'}    ")
-    p.add_run("SCH:").bold = True
-    p.add_run(f" {school or '..................................................'}")
-    p = doc.add_paragraph()
-    p.add_run("LEVEL:").bold = True
-    p.add_run(f" {level or '..................................................'}    ")
     p.add_run("ACADEMIC YEAR:").bold = True
     p.add_run(f" {year or '................'}")
     p = doc.add_paragraph()
@@ -913,7 +1023,7 @@ def download_report(request):
         run.italic = True
     doc.add_paragraph()
     # FOOTER IMAGE (full width, very bottom)
-    doc.add_picture('C:/Users/PETER/Desktop/exam mangement/report/foot.png', width=Inches(7.0))
+    doc.add_picture('report/foot.png', width=Inches(7.0))
     f = io.BytesIO()
     doc.save(f)
     f.seek(0)
@@ -928,30 +1038,45 @@ def pass_list(request):
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
     
-    if request.user.is_superuser:
-        records = ExamRecord.objects.all()
+    # Respect campus selection for both superusers and regular users
+    if current_campus:
+        records = ExamRecord.objects.filter(student__course__school__campus=current_campus)
     else:
-        records = ExamRecord.objects.filter(campus=current_campus)
+        # If no campus is selected and user is superuser, show all
+        if request.user.is_superuser:
+            records = ExamRecord.objects.all()
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
-    # Filter passing students (total average >= 40)
-    passing_records = [r for r in records if r.total_average >= 40]
-    
-    # Group by student
+    # Calculate averages and filter passing students (total average >= 40)
     students_passed = {}
-    for record in passing_records:
-        student = record.student
-        if student.id not in students_passed:
-            students_passed[student.id] = {
-                'student': student,
-                'records': [],
-                'average': 0
-            }
-        students_passed[student.id]['records'].append(record)
+    for record in records:
+        # Skip records with incomplete scores
+        if not all([record.cat1_score, record.cat2_score, record.end_term_score]):
+            continue
+            
+        # Calculate total average for this record
+        total_avg = float(record.cat_average + record.end_term_score)
+        
+        # Only include passing records (total_avg >= 40)
+        if total_avg >= 40:
+            student = record.student
+            if student.id not in students_passed:
+                students_passed[student.id] = {
+                    'student': student,
+                    'records': [],
+                    'average': 0,
+                    'count': 0,
+                    'total': 0
+                }
+            students_passed[student.id]['records'].append(record)
+            students_passed[student.id]['count'] += 1
+            students_passed[student.id]['total'] += total_avg
     
-    # Calculate average for each student
+    # Calculate overall average for each student
     for student_data in students_passed.values():
-        total_avg = sum(r.total_average for r in student_data['records'])
-        student_data['average'] = total_avg / len(student_data['records'])
+        student_data['average'] = student_data['total'] / student_data['count'] if student_data['count'] > 0 else 0
     
     # Sort by average
     sorted_students = sorted(students_passed.values(), key=lambda x: x['average'], reverse=True)
@@ -959,6 +1084,7 @@ def pass_list(request):
     context = {
         'students_passed': sorted_students,
         'current_campus': current_campus,
+        'dashboard_url': reverse('exams:campus_select'),
     }
     return render(request, 'exams/pass_list.html', context)
 
@@ -968,30 +1094,45 @@ def download_pass_list(request):
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
     
-    if request.user.is_superuser:
-        records = ExamRecord.objects.all()
+    # Respect campus selection for both superusers and regular users
+    if current_campus:
+        records = ExamRecord.objects.filter(student__course__school__campus=current_campus)
     else:
-        records = ExamRecord.objects.filter(campus=current_campus)
+        # If no campus is selected and user is superuser, show all
+        if request.user.is_superuser:
+            records = ExamRecord.objects.all()
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
-    # Filter passing students
-    passing_records = [r for r in records if r.total_average >= 40]
-    
-    # Group by student
+    # Calculate averages and filter passing students (total average >= 40)
     students_passed = {}
-    for record in passing_records:
-        student = record.student
-        if student.id not in students_passed:
-            students_passed[student.id] = {
-                'student': student,
-                'records': [],
-                'average': 0
-            }
-        students_passed[student.id]['records'].append(record)
+    for record in records:
+        # Skip records with incomplete scores
+        if not all([record.cat1_score, record.cat2_score, record.end_term_score]):
+            continue
+            
+        # Calculate total average for this record
+        total_avg = float(record.cat_average + record.end_term_score)
+        
+        # Only include passing records (total_avg >= 40)
+        if total_avg >= 40:
+            student = record.student
+            if student.id not in students_passed:
+                students_passed[student.id] = {
+                    'student': student,
+                    'records': [],
+                    'average': 0,
+                    'count': 0,
+                    'total': 0
+                }
+            students_passed[student.id]['records'].append(record)
+            students_passed[student.id]['count'] += 1
+            students_passed[student.id]['total'] += total_avg
     
-    # Calculate average for each student
+    # Calculate overall average for each student
     for student_data in students_passed.values():
-        total_avg = sum(r.total_average for r in student_data['records'])
-        student_data['average'] = total_avg / len(student_data['records'])
+        student_data['average'] = student_data['total'] / student_data['count'] if student_data['count'] > 0 else 0
     
     # Sort by average
     sorted_students = sorted(students_passed.values(), key=lambda x: x['average'], reverse=True)
@@ -1040,10 +1181,15 @@ def download_records_word(request):
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
     
-    if request.user.is_superuser:
-        records = ExamRecord.objects.select_related('student', 'unit', 'unit__course').all()
+    if current_campus:
+        records = ExamRecord.objects.select_related('student', 'unit', 'unit__course').filter(student__course__school__campus=current_campus)
     else:
-        records = ExamRecord.objects.select_related('student', 'unit', 'unit__course').filter(campus=current_campus)
+        # If no campus is selected and user is superuser, show all
+        if request.user.is_superuser:
+            records = ExamRecord.objects.select_related('student', 'unit', 'unit__course').all()
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
     # Create Word document
     doc = Document()
@@ -1118,23 +1264,50 @@ def download_records_word(request):
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response 
 
+def enter_marks_spreadsheet(request):
+    current_campus = get_current_campus(request)
+    if not current_campus and not request.user.is_superuser:
+        return redirect('exams:campus_select')
+
+    if current_campus:
+        courses = Course.objects.filter(school__campus=current_campus)
+        units = Unit.objects.filter(course__school__campus=current_campus)
+    else:
+        courses = Course.objects.all()
+        units = Unit.objects.all()
+
+    context = {
+        'courses': courses,
+        'units': units,
+        'current_campus': current_campus,
+    }
+    return render(request, 'exams/enter_marks_spreadsheet.html', context)
+
+
 def enter_marks_per_student(request):
     current_campus = get_current_campus(request)
     if not current_campus and not request.user.is_superuser:
         return redirect('exams:campus_select')
     
-    if request.user.is_superuser:
-        students = Student.objects.all()
+    # Respect campus selection for both superusers and regular users
+    if current_campus:
+        students = Student.objects.filter(course__school__campus=current_campus)
     else:
-        students = Student.objects.filter(campus=current_campus)
+        # If no campus is selected and user is superuser, show all
+        if request.user.is_superuser:
+            students = Student.objects.all()
+        else:
+            # Regular users must have a campus selected
+            return redirect('exams:campus_select')
     
     years = [2025, 2024, 2023, 2022, 2021]
-    terms = ['I', 'II', 'III']
+    terms = ['Term 1', 'Term 2', 'Term 3', 'Term 4']
     
     selected_student = None
     selected_year = None
     selected_term = None
     unit_marks = []
+    available_units = []
     message = ''
     
     if request.method == 'POST' and 'select_student' in request.POST:
@@ -1144,15 +1317,20 @@ def enter_marks_per_student(request):
         selected_student = get_object_or_404(Student, id=student_id)
         selected_year = year
         selected_term = term
-        units = Unit.objects.filter(course=selected_student.course)
-        for unit in units:
+        all_units = list(Unit.objects.filter(course=selected_student.course))
+        entered_units = []
+        for unit in all_units:
             rec = ExamRecord.objects.filter(student=selected_student, unit=unit, year=year, term=term).first()
-            unit_marks.append({
-                'unit': unit,
-                'cat1': rec.cat1_score if rec else '',
-                'cat2': rec.cat2_score if rec else '',
-                'endterm': rec.end_term_score if rec else '',
-            })
+            if rec:
+                unit_marks.append({
+                    'unit': unit,
+                    'cat1': rec.cat1_score,
+                    'cat2': rec.cat2_score,
+                    'endterm': rec.end_term_score,
+                    'has_record': True,
+                })
+                entered_units.append(unit.id)
+        available_units = [u for u in all_units if u.id not in entered_units]
     elif request.method == 'POST' and 'save_marks' in request.POST:
         student_id = request.POST.get('student_id')
         year = request.POST.get('year')
@@ -1163,9 +1341,11 @@ def enter_marks_per_student(request):
         school = request.POST.get('school')
         level = request.POST.get('level')
         i = 1
+        entered_units = []
         while True:
-            unit_name = request.POST.get(f'unit_name_{i}')
-            if not unit_name:
+            unit_id = request.POST.get(f'unit_id_{i}')
+            unit_name = request.POST.get(f'unit_name_{i}', '').strip()
+            if not unit_id:
                 break
             cat1 = request.POST.get(f'cat1_{i}')
             cat2 = request.POST.get(f'cat2_{i}')
@@ -1173,47 +1353,39 @@ def enter_marks_per_student(request):
             cat1_val = safe_decimal(cat1)
             cat2_val = safe_decimal(cat2)
             endterm_val = safe_decimal(endterm)
-            if cat1 or cat2 or endterm:
+            if unit_id == 'other' and unit_name:
                 unit, _ = Unit.objects.get_or_create(
-                    name=unit_name, 
-                    course=selected_student.course,
-                    defaults={
-                        'campus': current_campus or selected_student.campus
-                    }
+                    name=unit_name,
+                    course=selected_student.course
                 )
-                record, _ = ExamRecord.objects.get_or_create(
-                    student=selected_student,
-                    unit=unit,
-                    year=year,
-                    term=term,
-                    defaults={
-                        'school': school,
-                        'level': level,
-                        'cat1_score': cat1_val,
-                        'cat2_score': cat2_val,
-                        'end_term_score': endterm_val,
-                        'campus': current_campus or selected_student.campus,
-                    }
-                )
-                record.cat1_score = cat1_val
-                record.cat2_score = cat2_val
-                record.end_term_score = endterm_val
-                record.school = school
-                record.level = level
-                record.save()
+            else:
+                unit = Unit.objects.get(id=unit_id)
+            record, _ = ExamRecord.objects.get_or_create(
+                student=selected_student,
+                unit=unit,
+                year=year,
+                term=term,
+                defaults={
+                    'cat1_score': cat1_val,
+                    'cat2_score': cat2_val,
+                    'end_term_score': endterm_val,
+                }
+            )
+            record.cat1_score = cat1_val
+            record.cat2_score = cat2_val
+            record.end_term_score = endterm_val
+            record.school = school
+            record.level = level
+            record.save()
+            entered_units.append(unit.id)
             i += 1
         message = 'Marks saved successfully!'
-        # Rebuild unit_marks for display
+        # Reset form for next student
+        selected_student = None
+        selected_year = None
+        selected_term = None
         unit_marks = []
-        units = Unit.objects.filter(course=selected_student.course)
-        for unit in units:
-            rec = ExamRecord.objects.filter(student=selected_student, unit=unit, year=year, term=term).first()
-            unit_marks.append({
-                'unit': unit,
-                'cat1': rec.cat1_score if rec else '',
-                'cat2': rec.cat2_score if rec else '',
-                'endterm': rec.end_term_score if rec else '',
-            })
+        available_units = []
     context = {
         'students': students,
         'years': years,
@@ -1222,8 +1394,8 @@ def enter_marks_per_student(request):
         'selected_year': selected_year,
         'selected_term': selected_term,
         'unit_marks': unit_marks,
+        'available_units': available_units,
         'message': message,
-        'all_units': Unit.objects.all(),
         'current_campus': current_campus,
     }
     return render(request, 'exams/enter_marks_per_student.html', context) 

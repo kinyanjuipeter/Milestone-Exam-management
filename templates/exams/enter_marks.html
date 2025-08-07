@@ -3,11 +3,16 @@
 {% block title %}Enter Marks - Exam Management System{% endblock %}
 
 {% block content %}
+<div class="mb-3">
+    <a href="{% url 'exams:enter_marks_spreadsheet' %}" class="btn btn-outline-success">
+        <i class="fas fa-file-excel me-2"></i>Enter Marks via Spreadsheet
+    </a>
+</div>
 <div class="row">
     <div class="col-12">
         <h2 class="mb-4">
             <i class="fas fa-edit text-primary me-2"></i>
-            Enter Exam Marks (Bulk Entry)
+            Enter Marks
         </h2>
     </div>
 </div>
@@ -53,7 +58,12 @@
                             <label for="school" class="form-label">
                                 <i class="fas fa-school me-1"></i>School
                             </label>
-                            <input type="text" name="school" id="school" class="form-control" placeholder="Enter School Name" required>
+                            <select name="school" id="school" class="form-control" required>
+                                <option value="">Select School</option>
+                                {% for school in schools %}
+                                    <option value="{{ school.id }}">{{ school.name }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         
                         <div class="col-md-4 mb-3">
@@ -169,150 +179,169 @@
                             </button>
                         </div>
                     </div>
-                </form>
                 
-                <!-- Add New Student Section -->
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-info text-white">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-user-plus me-2"></i>Add New Student
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-5">
-                                        <input type="text" id="new_student_name" class="form-control" placeholder="Student Name">
-                                    </div>
-                                    <div class="col-md-5">
-                                        <input type="text" id="new_admission_number" class="form-control" placeholder="Admission Number">
-                                    </div>
-                                    <div class="col-md-2">
-                                        <button type="button" id="addStudentBtn" class="btn btn-info w-100">
-                                            <i class="fas fa-plus me-1"></i>Add
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
+                </form>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Single Entry Form (Collapsible) -->
+<!-- Multi-Unit Entry Form -->
 <div class="row mt-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header" id="singleEntryHeader">
+            <div class="card-header">
                 <h5 class="mb-0">
-                    <button class="btn btn-link text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#singleEntryCollapse">
-                        <i class="fas fa-plus me-2"></i>Single Entry Form
-                    </button>
+                    <i class="fas fa-plus me-2"></i>Multi-Unit Entry Form
                 </h5>
             </div>
-            <div id="singleEntryCollapse" class="collapse">
                 <div class="card-body">
-                    <form method="post" id="singleEntryForm">
+                {% if message %}
+                    <div class="alert alert-success">{{ message }}</div>
+                {% endif %}
+                <form method="post">
                     {% csrf_token %}
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.student.id_for_label }}" class="form-label">
-                                <i class="fas fa-user-graduate me-1"></i>Student
-                            </label>
-                            {{ form.student }}
-                            {% if form.student.errors %}
-                                <div class="text-danger small">{{ form.student.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ form.unit.id_for_label }}" class="form-label">
-                                <i class="fas fa-subject me-1"></i>Unit
-                            </label>
-                            {{ form.unit }}
-                            {% if form.unit.errors %}
-                                <div class="text-danger small">{{ form.unit.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <hr>
-                    
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label for="{{ form.cat1_score.id_for_label }}" class="form-label">
-                                <i class="fas fa-chart-line me-1"></i>CAT 1 Score
-                                <small class="text-muted">(0-30)</small>
-                            </label>
-                            {{ form.cat1_score }}
-                            {% if form.cat1_score.errors %}
-                                <div class="text-danger small">{{ form.cat1_score.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="col-md-4 mb-3">
-                            <label for="{{ form.cat2_score.id_for_label }}" class="form-label">
-                                <i class="fas fa-chart-line me-1"></i>CAT 2 Score
-                                <small class="text-muted">(0-30)</small>
-                            </label>
-                            {{ form.cat2_score }}
-                            {% if form.cat2_score.errors %}
-                                <div class="text-danger small">{{ form.cat2_score.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="col-md-4 mb-3">
-                            <label for="{{ form.end_term_score.id_for_label }}" class="form-label">
-                                <i class="fas fa-chart-bar me-1"></i>End Term Score
-                                <small class="text-muted">(0-70)</small>
-                            </label>
-                            {{ form.end_term_score }}
-                            {% if form.end_term_score.errors %}
-                                <div class="text-danger small">{{ form.end_term_score.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    <!-- Real-time Calculation Display -->
-                    <div class="row mt-3">
+                    <div class="row mb-3">
                         <div class="col-md-4">
-                            <div class="alert alert-info text-center">
-                                <h6 class="mb-1">CAT Average</h6>
-                                <h4 class="mb-0" id="catAverage">0.00</h4>
-                            </div>
+                            <label for="student" class="form-label">Student</label>
+                            <select name="student_id" id="student" class="form-control" required {% if selected_student %}disabled{% endif %}>
+                                <option value="">Select Student</option>
+                                {% for s in students %}
+                                    <option value="{{ s.id }}" {% if selected_student and s.id == selected_student.id %}selected{% endif %}>{{ s.name }} ({{ s.registration_number }})</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <div class="col-md-4">
-                            <div class="alert alert-success text-center">
-                                <h6 class="mb-1">Total Average</h6>
-                                <h4 class="mb-0" id="totalAverage">0.00</h4>
-                            </div>
+                            <label for="year" class="form-label">Year</label>
+                            <select name="year" id="year" class="form-control" required {% if selected_year %}disabled{% endif %}>
+                                <option value="">Select Year</option>
+                                {% for y in years %}
+                                    <option value="{{ y }}" {% if selected_year and y|stringformat:'s' == selected_year|stringformat:'s' %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <div class="col-md-4">
-                            <div class="alert alert-warning text-center">
-                                <h6 class="mb-1">Grade</h6>
-                                <h4 class="mb-0" id="grade">-</h4>
-                            </div>
+                            <label for="term" class="form-label">Term</label>
+                            <select name="term" id="term" class="form-control" required {% if selected_term %}disabled{% endif %}>
+                                <option value="">Select Term</option>
+                                {% for t in terms %}
+                                    <option value="{{ t }}" {% if selected_term and t == selected_term %}selected{% endif %}>{{ t }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                     </div>
-                    
-                    <div class="row mt-3">
-                        <div class="col-12">
-                            <button type="submit" class="btn btn-primary btn-lg w-100">
-                                <i class="fas fa-save me-2"></i>Save Exam Record
-                            </button>
-                        </div>
-                    </div>
+                    {% if not selected_student or not selected_year or not selected_term %}
+                        <button type="submit" name="select_student" class="btn btn-primary w-100">Next</button>
+                    {% endif %}
                 </form>
-                </div>
+                {% if selected_student and selected_year and selected_term %}
+                <hr>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="student_id" value="{{ selected_student.id }}">
+                    <input type="hidden" name="year" value="{{ selected_year }}">
+                    <input type="hidden" name="term" value="{{ selected_term }}">
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle text-center mx-auto" style="width: auto;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Unit</th>
+                                    <th>CAT 1</th>
+                                    <th>CAT 2</th>
+                                    <th>End Term</th>
+                                </tr>
+                            </thead>
+                            <tbody id="units-table-body">
+                                {% for mark in unit_marks %}
+                                <tr>
+                                    <td>
+                                        <select name="unit_id_{{ forloop.counter }}" class="form-control unit-select" disabled>
+                                            <option value="{{ mark.unit.id }}" selected>{{ mark.unit.name }}</option>
+                                            <option value="other">Other...</option>
+                                        </select>
+                                        <input type="hidden" name="unit_id_{{ forloop.counter }}" value="{{ mark.unit.id }}">
+                                        <input type="text" name="unit_name_{{ forloop.counter }}" class="form-control mt-2 d-none" placeholder="Enter unit name">
+                                    </td>
+                                    <td><input type="number" name="cat1_{{ forloop.counter }}" class="form-control" min="0" max="30" step="0.01" value="{{ mark.cat1 }}"></td>
+                                    <td><input type="number" name="cat2_{{ forloop.counter }}" class="form-control" min="0" max="30" step="0.01" value="{{ mark.cat2 }}"></td>
+                                    <td><input type="number" name="endterm_{{ forloop.counter }}" class="form-control" min="0" max="70" step="0.01" value="{{ mark.endterm }}"></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <div class="text-center">
+                            <button type="button" id="add-row-btn" class="btn btn-secondary mt-2">Add Unit</button>
+                        </div>
+                    </div>
+                    <button type="submit" name="save_marks" class="btn btn-success w-100">Save Marks</button>
+                </form>
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const addButton = document.getElementById('add-row-btn');
+                    let rowCount = {{ unit_marks|length }};
+                    let availableUnits = [
+                        {% for unit in available_units %}
+                            {id: {{ unit.id }}, name: "{{ unit.name|escapejs }}"},
+                        {% endfor %}
+                    ];
+                    if (addButton) {
+                        addButton.addEventListener('click', function() {
+                            rowCount++;
+                            const tbody = document.getElementById('units-table-body');
+                            const newRow = document.createElement('tr');
+                            let options = '';
+                            for (let u of availableUnits) {
+                                options += `<option value="${u.id}">${u.name}</option>`;
+                            }
+                            options += `<option value="other">Other...</option>`;
+                            newRow.innerHTML = `
+                                <td>
+                                    <select name="unit_id_${rowCount}" class="form-control unit-select">
+                                        ${options}
+                                    </select>
+                                    <input type="text" name="unit_name_${rowCount}" class="form-control mt-2 d-none" placeholder="Enter unit name">
+                                </td>
+                                <td><input type="number" name="cat1_${rowCount}" class="form-control" min="0" max="30" step="0.01"></td>
+                                <td><input type="number" name="cat2_${rowCount}" class="form-control" min="0" max="30" step="0.01"></td>
+                                <td><input type="number" name="endterm_${rowCount}" class="form-control" min="0" max="70" step="0.01"></td>
+                            `;
+                            tbody.appendChild(newRow);
+                            // Show/hide text input if 'Other...' is selected
+                            const select = newRow.querySelector('.unit-select');
+                            const textInput = newRow.querySelector('input[type="text"]');
+                            select.addEventListener('change', function() {
+                                if (this.value === 'other') {
+                                    textInput.classList.remove('d-none');
+                                    textInput.required = true;
+                                } else {
+                                    textInput.classList.add('d-none');
+                                    textInput.required = false;
+                                }
+                            });
+                        });
+                    }
+                    // For pre-filled rows, handle 'Other...' if ever enabled
+                    document.querySelectorAll('.unit-select').forEach(function(select) {
+                        const textInput = select.parentElement.querySelector('input[type="text"]');
+                        select.addEventListener('change', function() {
+                            if (this.value === 'other') {
+                                textInput.classList.remove('d-none');
+                                textInput.required = true;
+                            } else {
+                                textInput.classList.add('d-none');
+                                textInput.required = false;
+                            }
+                        });
+                    });
+                });
+                </script>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
+<!-- End Multi-Unit Entry Form -->
 
 <!-- Quick Stats -->
 <div class="row mt-4">
@@ -395,71 +424,36 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('studentsTableSection').style.display = 'block';
     });
     
-    // Add New Student Button
-    document.getElementById('addStudentBtn').addEventListener('click', function() {
-        const studentName = document.getElementById('new_student_name').value.trim();
-        const admissionNumber = document.getElementById('new_admission_number').value.trim();
+    // Form validation before submission
+    document.getElementById('marksEntryForm').addEventListener('submit', function(e) {
+        const courseValue = document.getElementById('course_hidden').value;
+        const unitValue = document.getElementById('unit_hidden').value;
+        const termValue = document.getElementById('term_hidden').value;
+        const yearValue = document.getElementById('year_hidden').value;
         
-        if (!studentName || !admissionNumber) {
-            alert('Please enter both student name and admission number.');
+        if (!courseValue || !unitValue || !termValue || !yearValue) {
+            e.preventDefault();
+            alert('Please configure all settings (course, unit, term, year) before saving marks.');
             return;
         }
         
-        addNewStudentToTable(studentName, admissionNumber);
-        
-        // Clear the inputs
-        document.getElementById('new_student_name').value = '';
-        document.getElementById('new_admission_number').value = '';
-    });
-    
-    function addNewStudentToTable(name, admissionNumber) {
+        // Check if there are any students in the table
         const tbody = document.getElementById('studentsTableBody');
-        const rowCount = tbody.children.length;
+        if (tbody.children.length === 0) {
+            e.preventDefault();
+            alert('No students found. Please load students or add new students before saving.');
+            return;
+        }
         
-        // Generate a temporary ID for the new student
-        const tempId = 'new_' + Date.now() + '_' + rowCount;
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${rowCount + 1}</td>
-            <td>${name}</td>
-            <td>${admissionNumber}</td>
-            <td>
-                <input type="number" name="cat1_${tempId}" class="form-control cat1-input" 
-                       min="0" max="30" step="0.01" placeholder="0-30">
-            </td>
-            <td>
-                <input type="number" name="cat2_${tempId}" class="form-control cat2-input" 
-                       min="0" max="30" step="0.01" placeholder="0-30">
-            </td>
-            <td>
-                <input type="number" name="endterm_${tempId}" class="form-control endterm-input" 
-                       min="0" max="70" step="0.01" placeholder="0-70">
-            </td>
-            <td>
-                <span class="total-score">0.00</span>
-            </td>
-        `;
-        
-        // Add hidden fields for student info
-        const form = document.getElementById('marksEntryForm');
-        const studentNameInput = document.createElement('input');
-        studentNameInput.type = 'hidden';
-        studentNameInput.name = `student_name_${tempId}`;
-        studentNameInput.value = name;
-        form.appendChild(studentNameInput);
-        
-        const admissionNumberInput = document.createElement('input');
-        admissionNumberInput.type = 'hidden';
-        admissionNumberInput.name = `admission_number_${tempId}`;
-        admissionNumberInput.value = admissionNumber;
-        form.appendChild(admissionNumberInput);
-        
-        tbody.appendChild(row);
-        
-        // Add event listeners for real-time calculation
-        addCalculationListeners();
-    }
+        // Debug: Log form data
+        console.log('DEBUG: Form submission - checking for new students...');
+        const formData = new FormData(this);
+        for (let [key, value] of formData.entries()) {
+            if (key.startsWith('cat1_new_') || key.startsWith('student_name_') || key.startsWith('admission_number_')) {
+                console.log(`DEBUG: Found key: ${key}, value: ${value}`);
+            }
+        }
+    });
     
     function loadStudentsForCourse(courseId) {
         const tbody = document.getElementById('studentsTableBody');
@@ -473,27 +467,76 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Create table rows
+        // Get current configuration values
+        const unitValue = document.getElementById('unit_hidden').value || '';
+        const termValue = document.getElementById('term_hidden').value || '';
+        const yearValue = document.getElementById('year_hidden').value || '';
+        
+        // If we have all configuration values, fetch existing marks
+        if (unitValue && termValue && yearValue) {
+            fetchExistingMarks(courseId, unitValue, termValue, yearValue, courseStudents, tbody);
+        } else {
+            // Create table rows without existing marks
+            createStudentRows(courseStudents, tbody, {});
+        }
+    }
+    
+    function fetchExistingMarks(courseId, unitValue, termValue, yearValue, courseStudents, tbody) {
+        const params = new URLSearchParams({
+            course_id: courseId,
+            unit_id: unitValue,
+            term: termValue,
+            year: yearValue
+        });
+        
+        fetch(`/get-existing-marks/?${params}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error fetching existing marks:', data.error);
+                    createStudentRows(courseStudents, tbody, {});
+                } else {
+                    createStudentRows(courseStudents, tbody, data.existing_marks);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching existing marks:', error);
+                createStudentRows(courseStudents, tbody, {});
+            });
+    }
+    
+    function createStudentRows(courseStudents, tbody, existingMarks) {
         courseStudents.forEach((student, index) => {
+            const marks = existingMarks[student.id] || {};
+            const hasExistingMarks = marks.cat1_score || marks.cat2_score || marks.end_term_score;
+            
             const row = document.createElement('tr');
+            if (hasExistingMarks) {
+                row.className = 'table-warning';
+                row.title = 'This student already has marks for this unit/term/year';
+            }
+            
             row.innerHTML = `
                 <td>${index + 1}</td>
-                <td>${student.name}</td>
+                <td>
+                    ${student.name}
+                    ${hasExistingMarks ? '<i class="fas fa-check-circle text-success ms-2" title="Existing marks found"></i>' : ''}
+                </td>
                 <td>${student.registration_number}</td>
                 <td>
                     <input type="number" name="cat1_${student.id}" class="form-control cat1-input" 
-                           min="0" max="30" step="0.01" placeholder="0-30">
+                           min="0" max="30" step="0.01" placeholder="0-30" value="${marks.cat1_score || ''}">
                 </td>
                 <td>
                     <input type="number" name="cat2_${student.id}" class="form-control cat2-input" 
-                           min="0" max="30" step="0.01" placeholder="0-30">
+                           min="0" max="30" step="0.01" placeholder="0-30" value="${marks.cat2_score || ''}">
                 </td>
                 <td>
                     <input type="number" name="endterm_${student.id}" class="form-control endterm-input" 
-                           min="0" max="70" step="0.01" placeholder="0-70">
+                           min="0" max="70" step="0.01" placeholder="0-70" value="${marks.end_term_score || ''}">
                 </td>
                 <td>
-                    <span class="total-score">0.00</span>
+                    <span class="total-score">${calculateTotal(marks.cat1_score, marks.cat2_score, marks.end_term_score)}</span>
                 </td>
             `;
             tbody.appendChild(row);
@@ -501,6 +544,38 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Add event listeners for real-time calculation
         addCalculationListeners();
+        
+        // Show notification if existing marks were loaded
+        const existingMarksCount = Object.values(existingMarks).filter(marks => 
+            marks.cat1_score || marks.cat2_score || marks.end_term_score
+        ).length;
+        
+        if (existingMarksCount > 0) {
+            const unitValue = document.getElementById('unit_hidden').value;
+            const termValue = document.getElementById('term_hidden').value;
+            const yearValue = document.getElementById('year_hidden').value;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-info alert-dismissible fade show mt-3';
+            notification.innerHTML = `
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Existing marks loaded!</strong> ${existingMarksCount} student(s) already have marks for ${unitValue} (${termValue}, ${yearValue}). 
+                You can update these marks or leave them unchanged.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            const tableSection = document.getElementById('studentsTableSection');
+            tableSection.insertBefore(notification, tableSection.firstChild);
+        }
+    }
+    
+    function calculateTotal(cat1, cat2, endterm) {
+        const cat1Val = parseFloat(cat1) || 0;
+        const cat2Val = parseFloat(cat2) || 0;
+        const endtermVal = parseFloat(endterm) || 0;
+        const catAverage = (cat1Val + cat2Val) / 2;
+        const total = catAverage + endtermVal;
+        return total.toFixed(2);
     }
     
     function addCalculationListeners() {
@@ -616,4 +691,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-{% endblock %} 
+{% endblock %}

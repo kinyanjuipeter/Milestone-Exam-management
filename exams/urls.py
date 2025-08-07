@@ -21,5 +21,7 @@ urlpatterns = [
     path('records/download/', views.download_records_word, name='download_records_word'),
     path('update-student/<int:student_id>/', views.update_student, name='update_student'),
     path('enter-marks-per-student/', views.enter_marks_per_student, name='enter_marks_per_student'),
+    path('enter-marks-spreadsheet/', views.enter_marks_spreadsheet, name='enter_marks_spreadsheet'),
     path('manage-campus-passwords/', views.manage_campus_passwords, name='manage_campus_passwords'),
-] 
+    path('get-existing-marks/', views.get_existing_marks, name='get_existing_marks'),
+]

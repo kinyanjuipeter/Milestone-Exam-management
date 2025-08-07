@@ -52,6 +52,24 @@
                                placeholder="Name or Reg No" value="{{ filters.student }}">
                     </div>
                     <div class="col-md-3">
+                        <label for="year" class="form-label">Year</label>
+                        <select name="year" id="year" class="form-control">
+                            <option value="">All Years</option>
+                            {% for y in years %}
+                                <option value="{{ y }}" {% if filters.year == y|stringformat:'s' %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="term" class="form-label">Term</label>
+                        <select name="term" id="term" class="form-control">
+                            <option value="">All Terms</option>
+                            {% for t in terms %}
+                                <option value="{{ t }}" {% if filters.term == t %}selected{% endif %}>{{ t }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
                         <label for="sort" class="form-label">Sort By</label>
                         <select name="sort" id="sort" class="form-control">
                             <option value="student__name" {% if filters.sort == 'student__name' %}selected{% endif %}>Student Name</option>
@@ -116,7 +134,7 @@
                                         <code>{{ record.student.registration_number }}</code>
                                     </td>
                                     <td>
-                                        <span class="badge bg-info">{{ record.unit.course.name }}</span>
+                                        <span class="badge bg-info">{{ record.student.course.name }}</span>
                                     </td>
                                     <td>{{ record.unit.name }}</td>
                                     <td>

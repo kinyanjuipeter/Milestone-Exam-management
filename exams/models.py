@@ -19,10 +19,10 @@ class CampusPassword(models.Model):
         return f"Password for {self.campus.name}"
 
 
-class Course(models.Model):
-    """Model for storing course information."""
-    name = models.CharField(max_length=100, unique=True)
-    campus = models.ForeignKey(Campus, on_delete=models.CASCADE, related_name='courses')
+class School(models.Model):
+    """Model for storing school information."""
+    name = models.CharField(max_length=100)  # Removed unique=True
+    campus = models.ForeignKey(Campus, on_delete=models.CASCADE, related_name='schools')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -31,13 +31,30 @@ class Course(models.Model):
 
     class Meta:
         ordering = ['name']
+        # Add unique constraint for name + campus to prevent duplicates within the same campus
+        unique_together = ['name', 'campus']
+
+
+class Course(models.Model):
+    """Model for storing course information."""
+    name = models.CharField(max_length=100)
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='courses', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+        # Add unique constraint for name + school to prevent duplicates within the same school
+        unique_together = ['name', 'school']
 
 
 class Unit(models.Model):
     """Model for storing unit/subject information."""
     name = models.CharField(max_length=100)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='units')
-    campus = models.ForeignKey(Campus, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -54,7 +71,6 @@ class Student(models.Model):
     name = models.CharField(max_length=200)
     registration_number = models.CharField(max_length=20, unique=True)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='students')
-    campus = models.ForeignKey(Campus, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -89,9 +105,6 @@ class ExamRecord(models.Model):
     )
     term = models.CharField(max_length=10, help_text="Term (e.g. I, II, III)", default="I")
     year = models.IntegerField(help_text="Year (e.g. 2025)", default=2025)
-    school = models.CharField(max_length=100, blank=True, null=True)
-    level = models.CharField(max_length=100, blank=True, null=True)
-    campus = models.ForeignKey(Campus, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -110,4 +123,4 @@ class ExamRecord(models.Model):
 
     class Meta:
         unique_together = ['student', 'unit', 'term', 'year']
-        ordering = ['student__name', 'unit__name'] 
+        ordering = ['student__name', 'unit__name']

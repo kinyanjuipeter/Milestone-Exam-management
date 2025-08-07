@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.decorators import user_passes_test
 from django.utils.decorators import method_decorator
-from .models import Course, Unit, Student, ExamRecord, Campus, CampusPassword
+from .models import Course, Unit, Student, ExamRecord, Campus, CampusPassword, School
 
 
 def is_superuser(user):
@@ -21,6 +21,24 @@ class CampusAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return super().get_queryset(request)
         return super().get_queryset(request).filter(id=request.session.get('campus_id'))
+
+
+@admin.register(School)
+class SchoolAdmin(admin.ModelAdmin):
+    list_display = ['name', 'campus', 'created_at', 'updated_at']
+    list_filter = ['campus']
+    search_fields = ['name']
+    ordering = ['name']
+    
+    def get_queryset(self, request):
+        # Superusers can see all schools, regular users see only their campus schools
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        campus_id = request.session.get('campus_id')
+        if campus_id:
+            return qs.filter(campus_id=campus_id)
+        return qs.none()
 
 
 @admin.register(CampusPassword)
@@ -54,9 +72,9 @@ class CampusPasswordAdmin(admin.ModelAdmin):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ['name', 'campus', 'created_at', 'updated_at']
-    list_filter = ['campus']
-    search_fields = ['name']
+    list_display = ['name', 'school', 'created_at', 'updated_at']
+    list_filter = ['school']
+    search_fields = ['name', 'school__name']
     ordering = ['name']
     
     def get_queryset(self, request):
@@ -66,14 +84,14 @@ class CourseAdmin(admin.ModelAdmin):
             return qs
         campus_id = request.session.get('campus_id')
         if campus_id:
-            return qs.filter(campus_id=campus_id)
+            return qs.filter(school__campus_id=campus_id)
         return qs.none()
 
 
 @admin.register(Unit)
 class UnitAdmin(admin.ModelAdmin):
-    list_display = ['name', 'course', 'campus', 'created_at', 'updated_at']
-    list_filter = ['course', 'campus']
+    list_display = ['name', 'course', 'created_at', 'updated_at']
+    list_filter = ['course']
     search_fields = ['name', 'course__name']
     ordering = ['course', 'name']
     
@@ -84,14 +102,14 @@ class UnitAdmin(admin.ModelAdmin):
             return qs
         campus_id = request.session.get('campus_id')
         if campus_id:
-            return qs.filter(campus_id=campus_id)
+            return qs.filter(course__school__campus_id=campus_id)
         return qs.none()
 
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ['name', 'registration_number', 'course', 'campus', 'created_at', 'updated_at']
-    list_filter = ['course', 'campus']
+    list_display = ['name', 'registration_number', 'course', 'created_at', 'updated_at']
+    list_filter = ['course']
     search_fields = ['name', 'registration_number', 'course__name']
     ordering = ['name']
     
@@ -102,14 +120,14 @@ class StudentAdmin(admin.ModelAdmin):
             return qs
         campus_id = request.session.get('campus_id')
         if campus_id:
-            return qs.filter(campus_id=campus_id)
+            return qs.filter(course__school__campus_id=campus_id)
         return qs.none()
 
 
 @admin.register(ExamRecord)
 class ExamRecordAdmin(admin.ModelAdmin):
-    list_display = ['student', 'unit', 'cat1_score', 'cat2_score', 'cat_average', 'end_term_score', 'total_average', 'campus']
-    list_filter = ['unit__course', 'unit', 'campus']
+    list_display = ['student', 'unit', 'cat1_score', 'cat2_score', 'cat_average', 'end_term_score', 'total_average']
+    list_filter = ['unit__course', 'unit']
     search_fields = ['student__name', 'student__registration_number', 'unit__name']
     readonly_fields = ['cat_average', 'total_average']
     ordering = ['student__name', 'unit__name']
@@ -134,7 +152,7 @@ class ExamRecordAdmin(admin.ModelAdmin):
             return qs
         campus_id = request.session.get('campus_id')
         if campus_id:
-            return qs.filter(campus_id=campus_id)
+            return qs.filter(student__course__school__campus_id=campus_id)
         return qs.none()
 
 
@@ -157,4 +175,4 @@ class CustomUserAdmin(UserAdmin):
 
 # Unregister the default User admin and register our custom one
 admin.site.unregister(User)
-admin.site.register(User, CustomUserAdmin) 
+admin.site.register(User, CustomUserAdmin)
